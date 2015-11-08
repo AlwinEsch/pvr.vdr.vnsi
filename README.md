@@ -8,7 +8,7 @@ To build add-on manually can you use the following ways:
 
 ##### Linux:
 
-###### 1. The first is step if you have the source code available:
+###### 1. The first step is if you have the source code available:
 ```bash
 # the following is only a example, dir can be everywhere, only 
 # the last value of cmake must point to them.
