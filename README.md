@@ -11,10 +11,12 @@ To build add-on manually can you use the following ways:
 ###### 1. The first is step if you have the source code available:
 ```bash
 # the following is only a example, dir can be everywhere, only 
-# the last value of cmake must point to them
+# the last value of cmake must point to them.
 #
-# This build becomes on the example created there on folder 
-# where "xbmc" is, also brings 'ls' for you <b>"... build xbmc ..."</b>
+# This build becomes on this example created there on folder 
+# where "xbmc" is, 'ls' brings for you on end as 
+# example "... build xbmc ...".
+
 mkdir ./build
 cd ./build
 cmake -DADDONS_TO_BUILD=pvr.vdr.vnsi \
