@@ -8,11 +8,7 @@ To build add-on manually can you use the following ways:
 
 ##### Linux:
 
-###### 1. Easiest:
-The easiest but not the cleanest way is the following, this is available if you have also the source code of Kodi
-itself (this create all available binary add-ons together).
-
-1. The first is step if you have the source code available:
+###### 1. The first is step if you have the source code available:
 ```bash
 # the following is only a example, dir can be everywhere, only 
 # the last value of cmake must point to them
