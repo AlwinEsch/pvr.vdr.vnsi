@@ -7,8 +7,8 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR})
 enable_language(CXX)
 
 find_package(kodi REQUIRED)
-find_package(kodiplatform REQUIRED)
-find_package(platform REQUIRED)
+#find_package(kodiplatform REQUIRED)
+#find_package(p8-platform)
 
 add_definitions(-DUSE_DEMUX)
 
@@ -61,15 +61,19 @@ list(APPEND VDR_SOURCES src/client.cpp
                         src/VNSIRecording.cpp
                         src/VNSISession.cpp)
 
-list(APPEND DEPLIBS ${platform_LIBRARIES})
+list(APPEND DEPLIBS ${p8-platform_LIBRARIES})
 if(WIN32)
   list(APPEND DEPLIBS ws2_32)
 endif()
 
+add_subdirectory(lib/kodi-addon-dev-kit/kodi-addon-sharedlibrary)
+list(APPEND DEPLIBS kodi.addon.sharedlibrary)
+
 include_directories(${INCLUDES}
                     ${kodiplatform_INCLUDE_DIRS}
-                    ${platform_INCLUDE_DIRS}
-                    ${KODI_INCLUDE_DIR})
+                    ${p8-platform_INCLUDE_DIRS}
+                    ${KODI_INCLUDE_DIR}
+                    lib/kodi-addon-dev-kit/include)
 
 build_addon(pvr.vdr.vnsi VDR DEPLIBS)
 

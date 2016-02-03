@@ -26,7 +26,7 @@
 #include "VNSIData.h"
 #include "VNSIChannelScan.h"
 #include "VNSIAdmin.h"
-#include "platform/util/util.h"
+#include "p8-platform/util/util.h"
 
 #include <sstream>
 #include <string>
@@ -34,7 +34,7 @@
 
 using namespace std;
 using namespace ADDON;
-using namespace PLATFORM;
+using namespace P8PLATFORM;
 
 ADDON_STATUS m_CurStatus      = ADDON_STATUS_UNKNOWN;
 
@@ -66,7 +66,7 @@ bool IsTimeshift;
 time_t TimeshiftStartTime;
 time_t TimeshiftEndTime;
 time_t TimeshiftPlayTime;
-PLATFORM::CMutex TimeshiftMutex;
+P8PLATFORM::CMutex TimeshiftMutex;
 
 extern "C" {
 
@@ -74,12 +74,23 @@ extern "C" {
  * Standart AddOn related public library functions
  ***********************************************************/
 
+KODI_HANDLE handle;
+
 ADDON_STATUS ADDON_Create(void* hdl, void* props)
 {
   if (!hdl || !props)
     return ADDON_STATUS_UNKNOWN;
 
-  XBMC = new CHelper_libXBMC_addon;
+  handle = KodiAPI_InitLibAddon(hdl);
+  if (handle == NULL)
+  {
+    fprintf(stderr, "Binary AddOn: %s\n", KodiAPI_ErrorCodeToString(KODI_API_lasterror));
+    return ADDON_STATUS_PERMANENT_FAILURE;
+  }
+
+   KodiAPI_Log(handle, ADDON_LOG_ERROR, "<<<<<<<<<<<<< HALLO >>>>>>>>>>>>>>");
+
+   XBMC = new CHelper_libXBMC_addon;
   if (!XBMC->RegisterMe(hdl))
   {
     SAFE_DELETE(XBMC);
@@ -114,13 +125,12 @@ ADDON_STATUS ADDON_Create(void* hdl, void* props)
   }
 
   XBMC->Log(LOG_DEBUG, "Creating VDR VNSI PVR-Client");
-
   m_CurStatus    = ADDON_STATUS_UNKNOWN;
 
-  /* Read setting "host" from settings.xml */
   char * buffer = (char*) malloc(128);
   buffer[0] = 0; /* Set the end of string */
 
+  /* Read setting "host" from settings.xml */
   if (XBMC->GetSetting("host", buffer))
     g_szHostname = buffer;
   else
@@ -747,10 +757,16 @@ bool OpenLiveStream(const PVR_CHANNEL &channel)
 {
   CloseLiveStream();
 
-  try {
+  try
+  {
     VNSIDemuxer = new cVNSIDemux;
+    TimeshiftStartTime = 0;
+    TimeshiftEndTime = 0;
+    TimeshiftPlayTime = 0;
     return VNSIDemuxer->OpenChannel(channel);
-  } catch (std::exception e) {
+  }
+  catch (std::exception e)
+  {
     XBMC->Log(LOG_ERROR, "%s - %s", __FUNCTION__, e.what());
     delete VNSIDemuxer;
     VNSIDemuxer = NULL;
@@ -779,7 +795,8 @@ PVR_ERROR GetStreamProperties(PVR_STREAM_PROPERTIES* pProperties)
 
 void DemuxAbort(void)
 {
-  if (VNSIDemuxer) VNSIDemuxer->Abort();
+  if (VNSIDemuxer)
+    VNSIDemuxer->Abort();
 }
 
 DemuxPacket* DemuxRead(void)
@@ -852,10 +869,24 @@ bool CanSeekStream(void)
   return ret;
 }
 
+bool IsRealTimeStream()
+{
+  if (VNSIDemuxer)
+  {
+    const CLockObject lock(TimeshiftMutex);
+    if (!IsTimeshift)
+      return true;
+    if (TimeshiftEndTime - TimeshiftPlayTime < 10)
+      return true;
+  }
+  return false;
+}
+
 bool SeekTime(int time, bool backwards, double *startpts)
 {
   bool ret = false;
-  try {
+  try
+  {
     if (VNSIDemuxer)
       ret = VNSIDemuxer->SeekTime(time, backwards, startpts);
   } catch (std::exception e) {
@@ -870,7 +901,7 @@ time_t GetPlayingTime()
   if (VNSIDemuxer)
   {
     const CLockObject lock(TimeshiftMutex);
-	time = TimeshiftPlayTime;
+    time = TimeshiftPlayTime;
   }
   return time;
 }
@@ -881,7 +912,7 @@ time_t GetBufferTimeStart()
   if (VNSIDemuxer)
   {
     const CLockObject lock(TimeshiftMutex);
-	time = TimeshiftStartTime;
+    time = TimeshiftStartTime;
   }
   return time;
 }
@@ -892,7 +923,7 @@ time_t GetBufferTimeEnd()
   if (VNSIDemuxer)
   {
     const CLockObject lock(TimeshiftMutex);
-	time = TimeshiftEndTime;
+    time = TimeshiftEndTime;
   }
   return time;
 }

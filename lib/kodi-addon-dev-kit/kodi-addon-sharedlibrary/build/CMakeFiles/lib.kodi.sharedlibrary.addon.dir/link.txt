@@ -1,0 +1,2 @@
+/usr/bin/ar cq liblib.kodi.sharedlibrary.addon.a  CMakeFiles/lib.kodi.sharedlibrary.addon.dir/src/AddonLibFunc_Base.cpp.o CMakeFiles/lib.kodi.sharedlibrary.addon.dir/src/InterProcess.cpp.o CMakeFiles/lib.kodi.sharedlibrary.addon.dir/home/alwin/Development/1/kodi/xbmc/addons/kodi-addon-dev-kit/shared-code/ErrorCodeNames.cpp.o CMakeFiles/lib.kodi.sharedlibrary.addon.dir/home/alwin/Development/1/kodi/xbmc/addons/kodi-addon-dev-kit/shared-code/LibraryVersion.cpp.o
+/usr/bin/ranlib liblib.kodi.sharedlibrary.addon.a

@@ -1,7 +1,7 @@
 # Kodi Media Center language file
 # Addon Name: VDR VNSI Client
 # Addon id: pvr.vdr.vnsi
-# Addon Provider: FernetMenta, Team XBMC
+# Addon Provider: FernetMenta, Team Kodi
 msgid ""
 msgstr ""
 "Project-Id-Version: KODI Main\n"
@@ -34,7 +34,7 @@ msgstr "Conversion du jeu de caractères"
 
 msgctxt "#30004"
 msgid "Connect timeout (s)"
-msgstr "Délai d'attente de connexion (s)"
+msgstr "Temporisation de connexion (s)"
 
 msgctxt "#30005"
 msgid "Allow VDR Messages"

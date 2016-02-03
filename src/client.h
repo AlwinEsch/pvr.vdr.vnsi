@@ -21,6 +21,19 @@
  */
 
 #include "kodi/libXBMC_addon.h"
+#ifdef LOG_DEBUG
+#undef LOG_DEBUG
+#endif
+#ifdef LOG_INFO
+#undef LOG_INFO
+#endif
+#ifdef LOG_NOTICE
+#undef LOG_NOTICE
+#endif
+#ifdef LOG_ERROR
+#undef LOG_ERROR
+#endif
+#include <kodi/AddonLib.h>
 #include "kodi/libXBMC_codec.h"
 #include "kodi/libXBMC_pvr.h"
 #include "kodi/libKODI_guilib.h"
