@@ -10,7 +10,7 @@
 #pragma once
 
 #include "VNSISession.h"
-#include "client.h"
+#include "addon.h"
 #include <string>
 #include <map>
 #include "kodi/xbmc_pvr_types.h"

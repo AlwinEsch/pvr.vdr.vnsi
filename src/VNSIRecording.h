@@ -10,7 +10,7 @@
 #pragma once
 
 #include "VNSISession.h"
-#include "client.h"
+#include "addon.h"
 
 class cVNSIRecording : public cVNSISession
 {

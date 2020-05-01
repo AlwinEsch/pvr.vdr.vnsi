@@ -8,7 +8,7 @@
 
 #include "Shader.h"
 #include <stdio.h>
-#include "../client.h"
+#include "../addon.h"
 
 #define LOG_SIZE 1024
 #define GLchar char

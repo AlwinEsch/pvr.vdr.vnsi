@@ -7,7 +7,7 @@
  *  See LICENSE.md for more information.
  */
 
-#include "client.h"
+#include "addon.h"
 #include "kodi/xbmc_pvr_dll.h"
 #include "VNSIDemux.h"
 #include "VNSIRecording.h"
@@ -28,7 +28,7 @@ using namespace P8PLATFORM;
 ADDON_STATUS m_CurStatus = ADDON_STATUS_UNKNOWN;
 
 /* User adjustable settings are saved here.
- * Default values are defined inside client.h
+ * Default values are defined inside addon.h
  * and exported to the other source files.
  */
 std::string   g_szHostname              = DEFAULT_HOST;

@@ -8,7 +8,7 @@
  */
 
 #include "VNSISession.h"
-#include "client.h"
+#include "addon.h"
 
 #include <errno.h>
 #include <fcntl.h>

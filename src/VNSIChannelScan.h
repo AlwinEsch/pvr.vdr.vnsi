@@ -10,7 +10,7 @@
 #pragma once
 
 #include "VNSIData.h"
-#include "client.h"
+#include "addon.h"
 #include <string>
 #include <map>
 

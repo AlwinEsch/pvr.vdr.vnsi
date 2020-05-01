@@ -11,7 +11,7 @@
 
 #include "VNSIData.h"
 #include "VNSIChannels.h"
-#include "client.h"
+#include "addon.h"
 
 class cOSDRender;
 

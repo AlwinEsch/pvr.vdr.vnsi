@@ -10,7 +10,7 @@
 #pragma once
 
 #include <inttypes.h>
-#include "client.h"
+#include "addon.h"
 
 #ifndef TARGET_WINDOWS
 // need to check for ntohll definition

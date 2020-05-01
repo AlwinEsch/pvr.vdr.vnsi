@@ -42,7 +42,7 @@ else()
   message(STATUS " VDR OSD support disabled because it is not migrated to DX11 yet")
 endif()
 
-list(APPEND VDR_SOURCES src/client.cpp
+list(APPEND VDR_SOURCES src/addon.cpp
                         src/requestpacket.cpp
                         src/responsepacket.cpp
                         src/tools.cpp
@@ -54,7 +54,7 @@ list(APPEND VDR_SOURCES src/client.cpp
                         src/VNSIRecording.cpp
                         src/VNSISession.cpp)
 
-list(APPEND VDR_HEADERS src/client.h
+list(APPEND VDR_HEADERS src/addon.h
                         src/requestpacket.h
                         src/responsepacket.h
                         src/tools.h
