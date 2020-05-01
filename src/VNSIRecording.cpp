@@ -7,19 +7,22 @@
  *  See LICENSE.md for more information.
  */
 
-#include <limits.h>
 #include "VNSIRecording.h"
+
 #include "responsepacket.h"
 #include "requestpacket.h"
 #include "vnsicommand.h"
+#include "Settings.h"
+
+#include <limits.h>
 
 #define SEEK_POSSIBLE 0x10 // flag used to check if protocol allows seeks
 
-using namespace ADDON;
-
-cVNSIRecording::cVNSIRecording()
+cVNSIRecording::cVNSIRecording(kodi::addon::CInstancePVRClient& instance)
+  : cVNSISession(instance),
+    m_instance(instance)
 {
-  m_currentPlayingRecordLengthMSec = 0;
+
 }
 
 cVNSIRecording::~cVNSIRecording()
@@ -27,11 +30,11 @@ cVNSIRecording::~cVNSIRecording()
   Close();
 }
 
-bool cVNSIRecording::OpenRecording(const PVR_RECORDING& recinfo)
+bool cVNSIRecording::OpenRecording(const kodi::addon::PVRRecording& recinfo)
 {
   m_recinfo = recinfo;
 
-  if(!cVNSISession::Open(g_szHostname, g_iPort, "XBMC RecordingStream Receiver"))
+  if(!cVNSISession::Open(CVNSISettings::Get().GetHostname(), CVNSISettings::Get().GetPort(), "XBMC RecordingStream Receiver"))
     return false;
 
   if(!cVNSISession::Login())
@@ -39,7 +42,7 @@ bool cVNSIRecording::OpenRecording(const PVR_RECORDING& recinfo)
 
   cRequestPacket vrp;
   vrp.init(VNSI_RECSTREAM_OPEN);
-  vrp.add_U32(atoi(recinfo.strRecordingId));
+  vrp.add_U32(std::stoi(recinfo.GetRecordingId()));
 
   auto vresp = ReadResult(&vrp);
   if (!vresp)
@@ -53,21 +56,24 @@ bool cVNSIRecording::OpenRecording(const PVR_RECORDING& recinfo)
     m_currentPlayingRecordPosition = 0;
   }
   else
-    XBMC->Log(LOG_ERROR, "%s - Can't open recording '%s'", __FUNCTION__, recinfo.strTitle);
+    kodi::Log(ADDON_LOG_ERROR, "%s - Can't open recording '%s'", __func__, recinfo.GetTitle().c_str());
 
   return (returnCode == VNSI_RET_OK);
 }
 
 void cVNSIRecording::Close()
 {
-  if(IsOpen())
+  if (IsOpen())
   {
-    try {
+    try
+    {
       cRequestPacket vrp;
       vrp.init(VNSI_RECSTREAM_CLOSE);
       ReadSuccess(&vrp);
-    } catch (std::exception e) {
-      XBMC->Log(LOG_ERROR, "%s - %s", __FUNCTION__, e.what());
+    }
+    catch (std::exception e)
+    {
+      kodi::Log(ADDON_LOG_ERROR, "%s - %s", __func__, e.what());
     }
   }
 
@@ -100,10 +106,10 @@ int cVNSIRecording::Read(unsigned char* buf, uint32_t buf_size)
     return -1;
 
   uint32_t length = vresp->getUserDataLength();
-  uint8_t *data   = vresp->getUserData();
+  uint8_t* data = vresp->getUserData();
   if (length > buf_size)
   {
-    XBMC->Log(LOG_ERROR, "%s: PANIC - Received more bytes as requested", __FUNCTION__);
+    kodi::Log(ADDON_LOG_ERROR, "%s: PANIC - Received more bytes as requested", __func__);
     return 0;
   }
 
@@ -112,16 +118,16 @@ int cVNSIRecording::Read(unsigned char* buf, uint32_t buf_size)
   return length;
 }
 
-bool cVNSIRecording::GetStreamTimes(PVR_STREAM_TIMES *times)
+bool cVNSIRecording::GetStreamTimes(kodi::addon::PVRStreamTimes& times)
 {
   GetLength();
   if (m_currentPlayingRecordLengthMSec == 0)
     return false;
 
-  times->startTime = 0;
-  times->ptsStart = 0;
-  times->ptsBegin = 0;
-  times->ptsEnd = m_currentPlayingRecordLengthMSec * 1000;
+  times.SetStartTime(0);
+  times.SetPTSStart(0);
+  times.SetPTSBegin(0);
+  times.SetPTSEnd(m_currentPlayingRecordLengthMSec * 1000);
 
   return true;
 }

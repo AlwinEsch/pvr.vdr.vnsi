@@ -12,31 +12,33 @@
 #include "VNSISession.h"
 #include "addon.h"
 
-class cVNSIRecording : public cVNSISession
+#include <kodi/addon-instance/PVRClient.h>
+
+class ATTRIBUTE_HIDDEN cVNSIRecording : public cVNSISession
 {
 public:
-
-  cVNSIRecording();
+  cVNSIRecording(kodi::addon::CInstancePVRClient& instance);
   ~cVNSIRecording();
 
-  bool OpenRecording(const PVR_RECORDING& recinfo);
+  bool OpenRecording(const kodi::addon::PVRRecording& recinfo);
   void Close() override;
 
   int Read(unsigned char* buf, uint32_t buf_size);
   long long Seek(long long pos, uint32_t whence);
   long long Length(void);
-  bool GetStreamTimes(PVR_STREAM_TIMES *times);
+  bool GetStreamTimes(kodi::addon::PVRStreamTimes& times);
 
 protected:
-
   void OnReconnect() override;
   void GetLength();
 
 private:
 
-  PVR_RECORDING m_recinfo;
-  uint64_t m_currentPlayingRecordBytes;
-  uint64_t m_currentPlayingRecordLengthMSec;
-  uint32_t m_currentPlayingRecordFrames;
-  uint64_t m_currentPlayingRecordPosition;
+  kodi::addon::PVRRecording m_recinfo;
+  uint64_t m_currentPlayingRecordBytes = 0;
+  uint64_t m_currentPlayingRecordLengthMSec = 0;
+  uint32_t m_currentPlayingRecordFrames = 0;
+  uint64_t m_currentPlayingRecordPosition = 0;
+
+  kodi::addon::CInstancePVRClient& m_instance;
 };

@@ -10,16 +10,13 @@
 #include "VNSIChannels.h"
 #include <algorithm>
 
-CProvider::CProvider()
-  :m_name(""), m_caid(0), m_whitelist(false)
+CProvider::CProvider(std::string name, int caid)
+  : m_name(name),
+    m_caid(caid),
+    m_whitelist(false)
 {
 
 }
-
-CProvider::CProvider(std::string name, int caid)
-  :m_name(name), m_caid(caid), m_whitelist(false)
-{
-};
 
 bool CProvider::operator==(const CProvider &rhs) const
 {
@@ -35,7 +32,7 @@ void CChannel::SetCaids(const char *caids)
   m_caids.clear();
   std::string strCaids = caids;
   size_t pos = strCaids.find("caids:");
-  if(pos == strCaids.npos)
+  if (pos == strCaids.npos)
     return;
 
   strCaids.erase(0,6);
@@ -54,13 +51,6 @@ void CChannel::SetCaids(const char *caids)
     caid = strtol(strCaids.c_str(), &pend, 10);
     m_caids.push_back(caid);
   }
-}
-
-CVNSIChannels::CVNSIChannels()
-{
-  m_loaded = false;
-  m_mode = NONE;
-  m_radio = false;
 }
 
 void CVNSIChannels::CreateProviders()
@@ -103,7 +93,7 @@ void CVNSIChannels::LoadProviderWhitelist()
   for (auto &w : m_providerWhitelist)
   {
     auto p_it = std::find(m_providers.begin(), m_providers.end(), w);
-    if(p_it != m_providers.end())
+    if (p_it != m_providers.end())
     {
       p_it->m_whitelist = true;
     }
@@ -115,7 +105,7 @@ void CVNSIChannels::LoadChannelBlacklist()
   for (auto b : m_channelBlacklist)
   {
     auto it = m_channelsMap.find(b);
-    if(it!=m_channelsMap.end())
+    if (it!=m_channelsMap.end())
     {
       int idx = it->second;
       m_channels[idx].m_blacklist = true;
@@ -128,10 +118,10 @@ void CVNSIChannels::ExtractProviderWhitelist()
   m_providerWhitelist.clear();
   for (const auto &provider : m_providers)
   {
-    if(provider.m_whitelist)
+    if (provider.m_whitelist)
       m_providerWhitelist.push_back(provider);
   }
-  if(m_providerWhitelist.size() == m_providers.size())
+  if (m_providerWhitelist.size() == m_providers.size())
   {
     m_providerWhitelist.clear();
   }
@@ -150,7 +140,7 @@ void CVNSIChannels::ExtractChannelBlacklist()
   m_channelBlacklist.clear();
   for (const auto &channel : m_channels)
   {
-    if(channel.m_blacklist)
+    if (channel.m_blacklist)
       m_channelBlacklist.push_back(channel.m_id);
   }
 }
@@ -163,14 +153,14 @@ bool CVNSIChannels::IsWhitelist(const CChannel &channel) const
   {
     provider.m_caid = 0;
     auto p_it = std::find(m_providers.begin(), m_providers.end(), provider);
-    if(p_it!=m_providers.end() && p_it->m_whitelist)
+    if (p_it!=m_providers.end() && p_it->m_whitelist)
       return true;
   }
   for (auto caid : channel.m_caids)
   {
     provider.m_caid = caid;
     auto p_it = std::find(m_providers.begin(), m_providers.end(), provider);
-    if(p_it!=m_providers.end() && p_it->m_whitelist)
+    if (p_it!=m_providers.end() && p_it->m_whitelist)
       return true;
   }
   return false;

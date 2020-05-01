@@ -9,30 +9,20 @@
 
 #pragma once
 
-#include "VNSISession.h"
 #include "addon.h"
-#include <string>
+#include "VNSISession.h"
+
+#include <kodi/addon-instance/PVRClient.h>
 #include <map>
-#include "kodi/xbmc_pvr_types.h"
+#include <string>
 
 class cResponsePacket;
 
-struct SQuality
-{
-  std::string fe_name;
-  std::string fe_status;
-  uint32_t    fe_snr;
-  uint32_t    fe_signal;
-  uint32_t    fe_ber;
-  uint32_t    fe_unc;
-};
-
-class CVNSIDemuxStatus : public cVNSISession
+class ATTRIBUTE_HIDDEN CVNSIDemuxStatus : public cVNSISession
 {
 public:
-
-  CVNSIDemuxStatus() = default;
-  virtual ~CVNSIDemuxStatus() = default;
+  CVNSIDemuxStatus(kodi::addon::CInstancePVRClient& instance);
+  ~CVNSIDemuxStatus() override = default;
 
   int GetSocket();
   void ReleaseServerClient();
@@ -40,36 +30,34 @@ public:
   bool IsConnected();
 };
 
-class cVNSIDemux : public cVNSISession
+class ATTRIBUTE_HIDDEN cVNSIDemux : public cVNSISession
 {
 public:
+  cVNSIDemux(kodi::addon::CInstancePVRClient& instance);
+  ~cVNSIDemux() override;
 
-  cVNSIDemux();
-  virtual ~cVNSIDemux();
-
-  void Close();
-  bool OpenChannel(const PVR_CHANNEL &channelinfo);
+  void Close() override;
+  bool OpenChannel(const kodi::addon::PVRChannel& channelinfo);
   void Abort();
-  bool GetStreamProperties(PVR_STREAM_PROPERTIES* props);
+  bool GetStreamProperties(std::vector<kodi::addon::PVRStreamProperties>& props);
   DemuxPacket* Read();
-  bool SwitchChannel(const PVR_CHANNEL &channelinfo);
-  int CurrentChannel() { return m_channelinfo.iChannelNumber; }
-  bool GetSignalStatus(PVR_SIGNAL_STATUS *qualityinfo);
+  bool SwitchChannel(const kodi::addon::PVRChannel& channelinfo);
+  int CurrentChannel() { return m_channelinfo.GetChannelNumber(); }
+  bool GetSignalStatus(kodi::addon::PVRSignalStatus& qualityinfo);
   bool IsTimeshift() { return m_bTimeshift; }
-  bool SeekTime(int time, bool backwards, double *startpts);
-  bool GetStreamTimes(PVR_STREAM_TIMES *times);
+  bool SeekTime(int time, bool backwards, double& startpts);
+  bool GetStreamTimes(kodi::addon::PVRStreamTimes& times);
 
 protected:
-
-  void StreamChange(cResponsePacket *resp);
-  void StreamStatus(cResponsePacket *resp);
-  void StreamSignalInfo(cResponsePacket *resp);
-  bool StreamContentInfo(cResponsePacket *resp);
+  void StreamChange(cResponsePacket* resp);
+  void StreamStatus(cResponsePacket* resp);
+  void StreamSignalInfo(cResponsePacket* resp);
+  bool StreamContentInfo(cResponsePacket* resp);
   void ReadStatus();
 
-  PVR_STREAM_PROPERTIES m_streams;
-  PVR_CHANNEL m_channelinfo;
-  SQuality m_Quality;
+  std::vector<kodi::addon::PVRStreamProperties> m_streams;
+  kodi::addon::PVRChannel m_channelinfo;
+  kodi::addon::PVRSignalStatus m_Quality;
   bool m_bTimeshift;
   uint32_t m_MuxPacketSerial;
   time_t m_ReferenceTime;
@@ -78,4 +66,6 @@ protected:
   double m_maxPTS;
   CVNSIDemuxStatus m_statusCon;
   time_t m_lastStatus = 0;
+
+  kodi::addon::CInstancePVRClient& m_instance;
 };

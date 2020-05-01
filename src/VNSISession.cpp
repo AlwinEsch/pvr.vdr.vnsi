@@ -8,35 +8,33 @@
  */
 
 #include "VNSISession.h"
+
 #include "addon.h"
+#include "responsepacket.h"
+#include "requestpacket.h"
+#include "tools.h"
+#include "vnsicommand.h"
+#include "Settings.h"
+#include "VNSIData.h"
 
 #include <errno.h>
 #include <fcntl.h>
+#include <kodi/DemuxPacket.h>
+#include <p8-platform/sockets/tcp.h>
+#include <p8-platform/util/timeutils.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#include "responsepacket.h"
-#include "requestpacket.h"
-#include "vnsicommand.h"
-#include "tools.h"
-#include "p8-platform/sockets/tcp.h"
-#include "p8-platform/util/timeutils.h"
-
 /* Needed on Mac OS/X */
- 
+
 #ifndef SOL_TCP
 #define SOL_TCP IPPROTO_TCP
 #endif
 
-using namespace ADDON;
-using namespace P8PLATFORM;
-
-cVNSISession::cVNSISession()
-  : m_protocol(0)
-  , m_socket(NULL)
-  , m_connectionLost(false)
+cVNSISession::cVNSISession(kodi::addon::CInstancePVRClient& instance)
+  : m_instance(instance)
 {
-  m_abort = false;
+
 }
 
 cVNSISession::~cVNSISession()
@@ -46,34 +44,34 @@ cVNSISession::~cVNSISession()
 
 void cVNSISession::Close()
 {
-  CLockObject lock(m_mutex);
+  P8PLATFORM::CLockObject lock(m_mutex);
   if (IsOpen())
   {
     m_socket->Close();
   }
 
   delete m_socket;
-  m_socket = NULL;
+  m_socket = nullptr;
 }
 
 bool cVNSISession::Open(const std::string& hostname, int port, const char *name)
 {
   Close();
 
-  uint64_t iNow = GetTimeMs();
-  uint64_t iTarget = iNow + g_iConnectTimeout * 1000;
+  uint64_t iNow = P8PLATFORM::GetTimeMs();
+  uint64_t iTarget = iNow + CVNSISettings::Get().GetConnectTimeout() * 1000;
   if (!m_socket)
-    m_socket = new CTcpConnection(hostname.c_str(), port);
+    m_socket = new P8PLATFORM::CTcpConnection(hostname.c_str(), port);
   while (!m_socket->IsOpen() && iNow < iTarget && !m_abort)
   {
     if (!m_socket->Open(iTarget - iNow))
-      CEvent::Sleep(100);
-    iNow = GetTimeMs();
+      P8PLATFORM::CEvent::Sleep(100);
+    iNow = P8PLATFORM::GetTimeMs();
   }
 
   if (!m_socket->IsOpen() && !m_abort)
   {
-    XBMC->Log(LOG_DEBUG, "%s - failed to connect to the backend (%s)", __FUNCTION__, m_socket->GetError().c_str());
+    kodi::Log(ADDON_LOG_DEBUG, "%s - failed to connect to the backend (%s)", __func__, m_socket->GetError().c_str());
     return false;
   }
 
@@ -112,31 +110,31 @@ bool cVNSISession::Login()
     uint32_t protocol = vresp->extract_U32();
     uint32_t vdrTime = vresp->extract_U32();
     int32_t vdrTimeOffset = vresp->extract_S32();
-    const char *ServerName = vresp->extract_String();
-    const char *ServerVersion = vresp->extract_String();
+    const char* serverName = vresp->extract_String();
+    const char* serverVersion = vresp->extract_String();
 
-    m_server = ServerName;
-    m_version = ServerVersion;
-    m_protocol = (int)protocol;
+    m_server = serverName;
+    m_version = serverVersion;
+    m_protocol = static_cast<int>(protocol);
 
     if (m_protocol < VNSI_MIN_PROTOCOLVERSION)
       throw "Protocol versions do not match";
 
     if (m_name.empty())
     {
-      XBMC->Log(LOG_INFO, "Logged in at '%lu+%i' to '%s' Version: '%s' with protocol version '%d'",
-                vdrTime, vdrTimeOffset, ServerName, ServerVersion, protocol);
+      kodi::Log(ADDON_LOG_INFO, "Logged in at '%lu+%i' to '%s' Version: '%s' with protocol version '%d'",
+                vdrTime, vdrTimeOffset, serverName, serverVersion, protocol);
     }
   }
   catch (const std::out_of_range& e)
   {
-    XBMC->Log(LOG_ERROR, "%s - %s", __FUNCTION__, e.what());
+    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __func__, e.what());
     Close();
     return false;
   }
-  catch (const char * str)
+  catch (const char* str)
   {
-    XBMC->Log(LOG_ERROR, "%s - %s", __FUNCTION__,str);
+    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __func__, str);
     Close();
     return false;
   }
@@ -152,7 +150,7 @@ std::unique_ptr<cResponsePacket> cVNSISession::ReadMessage(int iInitialTimeout /
 
   cResponsePacket* vresp = nullptr;
 
-  if(!ReadData((uint8_t*)&channelID, sizeof(uint32_t), iInitialTimeout))
+  if(!ReadData(reinterpret_cast<uint8_t*>(&channelID), sizeof(uint32_t), iInitialTimeout))
     return nullptr;
 
   // Data was read
@@ -160,21 +158,21 @@ std::unique_ptr<cResponsePacket> cVNSISession::ReadMessage(int iInitialTimeout /
   channelID = ntohl(channelID);
   if (channelID == VNSI_CHANNEL_STREAM)
   {
-    vresp = new cResponsePacket();
+    vresp = new cResponsePacket(m_instance);
 
     if (!ReadData(vresp->getHeader(), vresp->getStreamHeaderLength(), iDatapacketTimeout))
     {
       delete vresp;
-      XBMC->Log(LOG_ERROR, "%s - lost sync on channel stream packet", __FUNCTION__);
+      kodi::Log(ADDON_LOG_ERROR, "%s - lost sync on channel stream packet", __func__);
       SignalConnectionLost();
       return nullptr;
     }
     vresp->extractStreamHeader();
     userDataLength = vresp->getUserDataLength();
 
-    if(vresp->getOpCodeID() == VNSI_STREAM_MUXPKT)
+    if (vresp->getOpCodeID() == VNSI_STREAM_MUXPKT)
     {
-      DemuxPacket* p = PVR->AllocateDemuxPacket(userDataLength);
+      DemuxPacket* p = m_instance.AllocateDemuxPacket(userDataLength);
       userData = (uint8_t*)p;
       if (userDataLength > 0)
       {
@@ -182,87 +180,87 @@ std::unique_ptr<cResponsePacket> cVNSISession::ReadMessage(int iInitialTimeout /
           return nullptr;
         if (!ReadData(p->pData, userDataLength, iDatapacketTimeout))
         {
-          PVR->FreeDemuxPacket(p);
+          m_instance.FreeDemuxPacket(p);
           delete vresp;
-          XBMC->Log(LOG_ERROR, "%s - lost sync on channel stream mux packet", __FUNCTION__);
+          kodi::Log(ADDON_LOG_ERROR, "%s - lost sync on channel stream mux packet", __func__);
           SignalConnectionLost();
-          return NULL;
+          return nullptr;
         }
       }
     }
     else if (userDataLength > 0)
     {
-      userData = (uint8_t*)malloc(userDataLength);
+      userData = static_cast<uint8_t*>(malloc(userDataLength));
       if (!userData)
         return nullptr;
       if (!ReadData(userData, userDataLength, iDatapacketTimeout))
       {
         free(userData);
         delete vresp;
-        XBMC->Log(LOG_ERROR, "%s - lost sync on channel stream (other) packet", __FUNCTION__);
+        kodi::Log(ADDON_LOG_ERROR, "%s - lost sync on channel stream (other) packet", __func__);
         SignalConnectionLost();
-        return NULL;
+        return nullptr;
       }
     }
     vresp->setStream(userData, userDataLength);
   }
   else if (channelID == VNSI_CHANNEL_OSD)
   {
-    vresp = new cResponsePacket();
+    vresp = new cResponsePacket(m_instance);
 
     if (!ReadData(vresp->getHeader(), vresp->getOSDHeaderLength(), iDatapacketTimeout))
     {
-      XBMC->Log(LOG_ERROR, "%s - lost sync on osd packet", __FUNCTION__);
+      kodi::Log(ADDON_LOG_ERROR, "%s - lost sync on osd packet", __func__);
       SignalConnectionLost();
-      return NULL;
+      return nullptr;
     }
     vresp->extractOSDHeader();
     userDataLength = vresp->getUserDataLength();
 
-    userData = NULL;
+    userData = nullptr;
     if (userDataLength > 0)
     {
-      userData = (uint8_t*)malloc(userDataLength);
+      userData = static_cast<uint8_t*>(malloc(userDataLength));
       if (!userData)
         return nullptr;
       if (!ReadData(userData, userDataLength, iDatapacketTimeout))
       {
         free(userData);
         delete vresp;
-        XBMC->Log(LOG_ERROR, "%s - lost sync on additional osd packet", __FUNCTION__);
+        kodi::Log(ADDON_LOG_ERROR, "%s - lost sync on additional osd packet", __func__);
         SignalConnectionLost();
-        return NULL;
+        return nullptr;
       }
     }
     vresp->setOSD(userData, userDataLength);
   }
   else
   {
-    vresp = new cResponsePacket();
+    vresp = new cResponsePacket(m_instance);
 
     if (!ReadData(vresp->getHeader(), vresp->getHeaderLength(), iDatapacketTimeout))
     {
       delete vresp;
-      XBMC->Log(LOG_ERROR, "%s - lost sync on response packet", __FUNCTION__);
+      kodi::Log(ADDON_LOG_ERROR, "%s - lost sync on response packet", __func__);
       SignalConnectionLost();
-      return NULL;
+      return nullptr;
     }
     vresp->extractHeader();
     userDataLength = vresp->getUserDataLength();
 
-    userData = NULL;
+    userData = nullptr;
     if (userDataLength > 0)
     {
-      userData = (uint8_t*)malloc(userDataLength);
+      userData = static_cast<uint8_t*>(malloc(userDataLength));
       if (!userData)
         return nullptr;
       if (!ReadData(userData, userDataLength, iDatapacketTimeout))
       {
         free(userData);
         delete vresp;
-        XBMC->Log(LOG_ERROR, "%s - lost sync on additional response packet", __FUNCTION__);
+        kodi::Log(ADDON_LOG_ERROR, "%s - lost sync on additional response packet", __func__);
         SignalConnectionLost();
-        return NULL;
+        return nullptr;
       }
     }
 
@@ -277,7 +275,7 @@ std::unique_ptr<cResponsePacket> cVNSISession::ReadMessage(int iInitialTimeout /
 
 bool cVNSISession::TransmitMessage(cRequestPacket* vrp)
 {
-  CLockObject lock(m_mutex);
+  P8PLATFORM::CLockObject lock(m_mutex);
 
   if (!IsOpen())
     return false;
@@ -285,7 +283,8 @@ bool cVNSISession::TransmitMessage(cRequestPacket* vrp)
   ssize_t iWriteResult = m_socket->Write(vrp->getPtr(), vrp->getLen());
   if (iWriteResult != (ssize_t)vrp->getLen())
   {
-    XBMC->Log(LOG_ERROR, "%s - Failed to write packet (%s), bytes written: %d of total: %d", __FUNCTION__, m_socket->GetError().c_str(), iWriteResult, vrp->getLen());
+    kodi::Log(ADDON_LOG_ERROR, "%s - Failed to write packet (%s), bytes written: %d of total: %d",
+                __func__, m_socket->GetError().c_str(), iWriteResult, vrp->getLen());
     return false;
   }
   return true;
@@ -311,7 +310,7 @@ std::unique_ptr<cResponsePacket> cVNSISession::ReadResult(cRequestPacket* vrp)
   }
 
   SignalConnectionLost();
-  return NULL;
+  return nullptr;
 }
 
 bool cVNSISession::ReadSuccess(cRequestPacket* vrp)
@@ -325,7 +324,7 @@ bool cVNSISession::ReadSuccess(cRequestPacket* vrp)
 
   if (retCode != VNSI_RET_OK)
   {
-    XBMC->Log(LOG_ERROR, "%s - failed with error code '%i'", __FUNCTION__, retCode);
+    kodi::Log(ADDON_LOG_ERROR, "%s - failed with error code '%i'", __func__, retCode);
     return false;
   }
   return true;
@@ -347,7 +346,7 @@ cVNSISession::eCONNECTIONSTATE cVNSISession::TryReconnect()
   if (!Login())
     return CONN_LOGIN_FAILED;
 
-  XBMC->Log(LOG_DEBUG, "%s - reconnected", __FUNCTION__);
+  kodi::Log(ADDON_LOG_DEBUG, "%s - reconnected", __func__);
   m_connectionLost = false;
 
   OnReconnect();
@@ -357,16 +356,16 @@ cVNSISession::eCONNECTIONSTATE cVNSISession::TryReconnect()
 
 bool cVNSISession::IsOpen()
 {
-  CLockObject lock(m_mutex);
+  P8PLATFORM::CLockObject lock(m_mutex);
   return m_socket && m_socket->IsOpen();
 }
 
 void cVNSISession::SignalConnectionLost()
 {
-  if(m_connectionLost)
+  if (m_connectionLost)
     return;
 
-  XBMC->Log(LOG_ERROR, "%s - connection lost !!!", __FUNCTION__);
+  kodi::Log(ADDON_LOG_ERROR, "%s - connection lost !!!", __func__);
 
   m_connectionLost = true;
   Close();
@@ -397,5 +396,5 @@ bool cVNSISession::ReadData(uint8_t* buffer, int totalBytes, int timeout)
 
 void cVNSISession::SleepMs(int ms)
 {
-  CEvent::Sleep(ms);
+  P8PLATFORM::CEvent::Sleep(ms);
 }

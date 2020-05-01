@@ -10,7 +10,6 @@
 #pragma once
 
 #include <inttypes.h>
-#include "addon.h"
 
 #ifndef TARGET_WINDOWS
 // need to check for ntohll definition
@@ -22,5 +21,3 @@ uint64_t ntohll(uint64_t a);
 uint64_t htonll(uint64_t a);
 #endif
 #endif
-
-#include "xbmc_codec_descriptor.hpp"

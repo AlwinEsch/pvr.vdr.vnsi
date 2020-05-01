@@ -9,7 +9,7 @@
 #ifndef XBMC_CODEC_DESCRIPTOR_HPP
 #define XBMC_CODEC_DESCRIPTOR_HPP
 
-#include "kodi/libXBMC_pvr.h"
+#include <kodi/addon-instance/PVRClient.h>
 
 /**
  * Adapter which converts codec names used by tvheadend and VDR into their 
@@ -18,19 +18,14 @@
 class CodecDescriptor
 {
 public:
-  CodecDescriptor(void)
-  {
-    m_codec.codec_id   = XBMC_INVALID_CODEC_ID;
-    m_codec.codec_type = XBMC_CODEC_TYPE_UNKNOWN;
-  }
-
-  CodecDescriptor(xbmc_codec_t codec, const char* name) :
+  CodecDescriptor() = default;
+  CodecDescriptor(kodi::addon::PVRCodec codec, const std::string& name) :
     m_codec(codec),
     m_strName(name) {}
-  virtual ~CodecDescriptor(void) {}
+  virtual ~CodecDescriptor(void) = default;
 
   const std::string& Name(void) const  { return m_strName; }
-  xbmc_codec_t Codec(void) const { return m_codec; }
+  kodi::addon::PVRCodec Codec(void) const { return m_codec; }
 
   static CodecDescriptor GetCodecByName(const char* strCodecName)
   {
@@ -49,8 +44,8 @@ public:
   }
 
 private:
-  xbmc_codec_t m_codec;
-  std::string  m_strName;
+  kodi::addon::PVRCodec m_codec;
+  std::string m_strName;
 };
 
 #endif	/* XBMC_CODEC_DESCRIPTOR_HPP */

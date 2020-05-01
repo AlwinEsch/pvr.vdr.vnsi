@@ -11,21 +11,28 @@
 
 #include "VNSIData.h"
 
-class CProvider
+#include <map>
+#include <string>
+#include <vector>
+
+class ATTRIBUTE_HIDDEN CProvider
 {
 public:
-  CProvider();
+  CProvider() = default;
   CProvider(std::string name, int caid);
+
   bool operator==(const CProvider &rhs) const;
+
   std::string m_name;
-  int m_caid;
-  bool m_whitelist;
+  int m_caid = 0;
+  bool m_whitelist = false;
 };
 
-class CChannel
+class ATTRIBUTE_HIDDEN CChannel
 {
 public:
   void SetCaids(const char *caids);
+
   unsigned int m_id;
   unsigned int m_number;
   std::string m_name;
@@ -35,28 +42,30 @@ public:
   bool m_blacklist;
 };
 
-class CVNSIChannels
+class ATTRIBUTE_HIDDEN CVNSIChannels
 {
 public:
-  CVNSIChannels();
+  CVNSIChannels() = default;
+
   void CreateProviders();
   void LoadProviderWhitelist();
   void LoadChannelBlacklist();
   void ExtractProviderWhitelist();
   void ExtractChannelBlacklist();
   bool IsWhitelist(const CChannel &channel) const;
+
   std::vector<CChannel> m_channels;
   std::map<int, int> m_channelsMap;
   std::vector<CProvider> m_providers;
   std::vector<CProvider> m_providerWhitelist;
   std::vector<int> m_channelBlacklist;
-  bool m_loaded;
-  bool m_radio;
+  bool m_loaded = false;
+  bool m_radio = false;
 
   enum
   {
     NONE,
     PROVIDER,
     CHANNEL
-  }m_mode;
+  } m_mode = NONE;
 };

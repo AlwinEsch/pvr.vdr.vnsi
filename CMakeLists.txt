@@ -4,48 +4,33 @@ project(pvr.vdr.vnsi)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR})
 
 find_package(Kodi REQUIRED)
+find_package(glm REQUIRED)
 find_package(p8-platform REQUIRED)
 
-add_definitions(-DUSE_DEMUX)
-
-if(NOT WIN32)
-  find_package(EMBEDDED)
-  if((APP_RENDER_SYSTEM STREQUAL "gl" OR NOT APP_RENDER_SYSTEM) AND NOT EMBEDDED_FOUND)
-    find_package(OpenGL)
-  endif()
-
-  if(OPENGL_FOUND)
-    set(APP_RENDER_SYSTEM gl)
-    set(INCLUDES ${OPENGL_INCLUDE_DIR})
-    set(DEPLIBS ${OPENGL_LIBRARIES})
-    set(VDR_SOURCES src/shaders/GUIShader.cpp
-                    src/shaders/Matrix.cpp
-                    src/shaders/Shader.cpp)
-    add_definitions(-DHAS_GL)
-    message(STATUS "VDR OSD support enabled via OpenGL")
-  else()
-    find_package(OpenGLES2)
-    if(OPENGLES2_FOUND)
-      set(APP_RENDER_SYSTEM gles)
-      set(VDR_SOURCES src/shaders/GUIShader.cpp
-                      src/shaders/Matrix.cpp
-                      src/shaders/Shader.cpp)
-      add_definitions(-DHAS_GLES2)
-      set(INCLUDES ${OPENGLES2_INCLUDE_DIRS})
-      set(DEPLIBS ${OPENGLES2_LIBRARIES})
-      message(STATUS "VDR OSD support enabled via OpenGLES")
-    else()
-      message(STATUS " VDR OSD support disabled because OpenGL(ES) wasn't found")
-    endif()
-  endif()
+if(NOT WIN32 AND (APP_RENDER_SYSTEM STREQUAL "gl" OR NOT APP_RENDER_SYSTEM))
+  find_package(OpenGl REQUIRED)
+  set(DEPLIBS ${OPENGL_LIBRARIES})
+  set(INCLUDES ${OPENGL_INCLUDE_DIR})
+  add_definitions(${OPENGL_DEFINITIONS})
 else()
-  message(STATUS " VDR OSD support disabled because it is not migrated to DX11 yet")
+  find_package(OpenGLES REQUIRED)
+  set(DEPLIBS ${OPENGLES_LIBRARIES})
+  set(INCLUDES ${OPENGLES_INCLUDE_DIR})
+  add_definitions(${OPENGLES_DEFINITIONS})
 endif()
+
+include_directories(${INCLUDES}
+                    ${GLM_INCLUDE_DIR}
+                    ${p8-platform_INCLUDE_DIRS}
+                    ${KODI_INCLUDE_DIR}/..) # Hack way with "/..", need bigger Kodi cmake rework to match right include ways
+
+list(APPEND DEPLIBS ${p8-platform_LIBRARIES})
 
 list(APPEND VDR_SOURCES src/addon.cpp
                         src/requestpacket.cpp
                         src/responsepacket.cpp
                         src/tools.cpp
+                        src/Settings.cpp
                         src/VNSIAdmin.cpp
                         src/VNSIChannels.cpp
                         src/VNSIChannelScan.cpp
@@ -58,6 +43,7 @@ list(APPEND VDR_HEADERS src/addon.h
                         src/requestpacket.h
                         src/responsepacket.h
                         src/tools.h
+                        src/Settings.h
                         src/VNSIAdmin.h
                         src/VNSIChannelScan.h
                         src/VNSIChannels.h
@@ -66,19 +52,6 @@ list(APPEND VDR_HEADERS src/addon.h
                         src/VNSIDemux.h
                         src/VNSIRecording.h
                         src/VNSISession.h)
-
-list(APPEND DEPLIBS ${p8-platform_LIBRARIES})
-if(WIN32)
-  set(APP_RENDER_SYSTEM dx11)
-  list(APPEND DEPLIBS ws2_32)
-  add_definitions(-D_CRT_NONSTDC_NO_DEPRECATE)
-endif()
-
-message(STATUS "Configured render system: ${APP_RENDER_SYSTEM}")
-
-include_directories(${INCLUDES}
-                    ${p8-platform_INCLUDE_DIRS}
-                    ${KODI_INCLUDE_DIR}/..) # Hack way with "/..", need bigger Kodi cmake rework to match right include ways
 
 build_addon(pvr.vdr.vnsi VDR DEPLIBS)
 

@@ -9,12 +9,12 @@
 
 #pragma once
 
+#include <atomic>
+#include <kodi/addon-instance/PVRClient.h>
+#include <memory>
+#include <p8-platform/threads/threads.h>
 #include <stdint.h>
 #include <string>
-#include <atomic>
-#include "p8-platform/threads/threads.h"
-
-#include <memory>
 
 class cResponsePacket;
 class cRequestPacket;
@@ -24,13 +24,13 @@ namespace P8PLATFORM
   class CTcpConnection;
 }
 
-class cVNSISession
+class ATTRIBUTE_HIDDEN cVNSISession
 {
 public:
-  cVNSISession();
+  cVNSISession(kodi::addon::CInstancePVRClient& instance);
   virtual ~cVNSISession();
 
-  virtual bool Open(const std::string& hostname, int port, const char *name = nullptr);
+  virtual bool Open(const std::string& hostname, int port, const char* name = nullptr);
   virtual void Close();
 
   int GetProtocol() const { return m_protocol; }
@@ -46,7 +46,6 @@ public:
   };
 
 protected:
-
   virtual bool Login();
 
   std::unique_ptr<cResponsePacket> ReadMessage(int iInitialTimeout, int iDatapacketTimeout);
@@ -65,15 +64,16 @@ protected:
   int m_port;
   std::string m_name;
   P8PLATFORM::CMutex m_mutex;
-  int m_protocol;
+  int m_protocol = 0;
   std::string m_server;
   std::string m_version;
-  bool m_connectionLost;
-  std::atomic_bool m_abort;
+  bool m_connectionLost = false;
+  std::atomic_bool m_abort = {false};
 
 private:
-
   bool ReadData(uint8_t* buffer, int totalBytes, int timeout);
 
-  P8PLATFORM::CTcpConnection *m_socket;
+  P8PLATFORM::CTcpConnection* m_socket = nullptr;
+
+  kodi::addon::CInstancePVRClient& m_instance;
 };

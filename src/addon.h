@@ -9,28 +9,17 @@
 
 #pragma once
 
-#include "kodi/libXBMC_addon.h"
-#include "kodi/libXBMC_pvr.h"
-#include "kodi/libKODI_guilib.h"
+#include <kodi/AddonBase.h>
 
-#define DEFAULT_HOST          "127.0.0.1"
-#define DEFAULT_PORT          34890
-#define DEFAULT_CHARCONV      false
-#define DEFAULT_HANDLE_MSG    true
-#define DEFAULT_PRIORITY      0
-#define DEFAULT_TIMEOUT       3
-#define DEFAULT_AUTOGROUPS    false
-#define DEFAULT_CHUNKSIZE     65536
+class ATTRIBUTE_HIDDEN CPVRAddon : public kodi::addon::CAddonBase
+{
+public:
+  CPVRAddon() = default;
 
-extern bool         m_bCreated;
-extern std::string  g_szHostname;         ///< hostname or ip-address of the server
-extern int          g_iPort;              ///< TCP port of the vnsi server
-extern int          g_iConnectTimeout;    ///< Network connection / read timeout in seconds
-extern int          g_iPriority;          ///< The Priority this client have in response to other clients
-extern bool         g_bCharsetConv;       ///< Convert VDR's incoming strings to UTF8 character set
-extern int          g_iTimeshift;
-extern std::string  g_szIconPath;         ///< path to channel icons
+  ADDON_STATUS Create() override;
+  ADDON_STATUS SetSetting(const std::string& settingName, const kodi::CSettingValue& settingValue) override;
+  ADDON_STATUS CreateInstanceEx(int instanceType, std::string instanceID, KODI_HANDLE instance, KODI_HANDLE& addonInstance, const std::string &version) override;
+  void DestroyInstance(int instanceType, std::string instanceID, KODI_HANDLE addonInstance) override;
 
-extern ADDON::CHelper_libXBMC_addon *XBMC;
-extern CHelper_libKODI_guilib *GUI;
-extern CHelper_libXBMC_pvr   *PVR;
+private:
+};
