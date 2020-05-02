@@ -7,25 +7,24 @@
  *  See LICENSE.md for more information.
  */
 
-#include "VNSIDemux.h"
+#include "InputstreamDemux.h"
 
-#include "responsepacket.h"
-#include "requestpacket.h"
-#include "tools.h"
-#include "vnsicommand.h"
+#include "ClientInstance.h"
+#include "RequestPacket.h"
+#include "ResponsePacket.h"
 #include "Settings.h"
-#include "VNSIData.h"
+#include "Tools.h"
+#include "vnsicommand.h"
 
-#include <kodi/General.h>
 #include <limits.h>
 #include <stdint.h>
 #include <string.h>
 #include <time.h>
 
+#include <kodi/General.h>
+
 cVNSIDemux::cVNSIDemux(kodi::addon::CInstancePVRClient& instance)
-  : cVNSISession(instance),
-    m_statusCon(instance),
-    m_instance(instance)
+  : cVNSISession(instance), m_statusCon(instance), m_instance(instance)
 {
 }
 
@@ -63,10 +62,10 @@ void cVNSIDemux::Close()
 bool cVNSIDemux::OpenChannel(const kodi::addon::PVRChannel& channelinfo)
 {
   m_channelinfo = channelinfo;
-  if(!cVNSISession::Open(CVNSISettings::Get().GetHostname(), CVNSISettings::Get().GetPort()))
+  if (!cVNSISession::Open(CVNSISettings::Get().GetHostname(), CVNSISettings::Get().GetPort()))
     return false;
 
-  if(!cVNSISession::Login())
+  if (!cVNSISession::Login())
     return false;
 
   return SwitchChannel(m_channelinfo);
@@ -106,7 +105,7 @@ DemuxPacket* cVNSIDemux::Read()
   {
     StreamChange(resp.get());
     DemuxPacket* pkt = m_instance.AllocateDemuxPacket(0);
-    pkt->iStreamId  = DMX_SPECIALID_STREAMCHANGE;
+    pkt->iStreamId = DMX_SPECIALID_STREAMCHANGE;
     return pkt;
   }
   else if (resp->getOpCodeID() == VNSI_STREAM_STATUS)
@@ -123,7 +122,7 @@ DemuxPacket* cVNSIDemux::Read()
     if (StreamContentInfo(resp.get()))
     {
       DemuxPacket* pkt = m_instance.AllocateDemuxPacket(0);
-      pkt->iStreamId  = DMX_SPECIALID_STREAMCHANGE;
+      pkt->iStreamId = DMX_SPECIALID_STREAMCHANGE;
       return pkt;
     }
   }
@@ -419,11 +418,8 @@ void cVNSIDemux::StreamStatus(cResponsePacket* resp)
 
 void cVNSIDemux::StreamSignalInfo(cResponsePacket* resp)
 {
-  const char* name = resp->extract_String();
-  const char* status = resp->extract_String();
-
-  m_Quality.SetAdapterName(name);
-  m_Quality.SetAdapterStatus(status);
+  m_Quality.SetAdapterName(resp->extract_String());
+  m_Quality.SetAdapterStatus(resp->extract_String());
   m_Quality.SetSNR(resp->extract_U32());
   m_Quality.SetSignal(resp->extract_U32());
   m_Quality.SetBER(resp->extract_U32());
@@ -492,7 +488,6 @@ bool cVNSIDemux::StreamContentInfo(cResponsePacket* resp)
 CVNSIDemuxStatus::CVNSIDemuxStatus(kodi::addon::CInstancePVRClient& instance)
   : cVNSISession(instance)
 {
-
 }
 
 int CVNSIDemuxStatus::GetSocket()

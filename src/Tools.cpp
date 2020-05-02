@@ -6,7 +6,7 @@
  *  See LICENSE.md for more information.
  */
 
-#include "tools.h"
+#include "Tools.h"
 
 #ifndef TARGET_WINDOWS
 #define TYP_INIT 0

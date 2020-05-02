@@ -9,9 +9,10 @@
 
 #pragma once
 
-#include <kodi/AddonBase.h>
 #include <stddef.h>
 #include <stdint.h>
+
+#include <kodi/AddonBase.h>
 
 class ATTRIBUTE_HIDDEN cRequestPacket
 {
@@ -19,7 +20,10 @@ public:
   cRequestPacket() = default;
   ~cRequestPacket();
 
-  void init(uint32_t opcode, bool stream = false, bool setUserDataLength = false, size_t userDataLength = 0);
+  void init(uint32_t opcode,
+            bool stream = false,
+            bool setUserDataLength = false,
+            size_t userDataLength = 0);
   void add_String(const char* string);
   void add_U8(uint8_t c);
   void add_U32(uint32_t ul);

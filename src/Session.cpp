@@ -7,23 +7,23 @@
  *  See LICENSE.md for more information.
  */
 
-#include "VNSISession.h"
+#include "Session.h"
 
-#include "addon.h"
-#include "responsepacket.h"
-#include "requestpacket.h"
-#include "tools.h"
-#include "vnsicommand.h"
+#include "ClientInstance.h"
+#include "RequestPacket.h"
+#include "ResponsePacket.h"
 #include "Settings.h"
-#include "VNSIData.h"
+#include "Tools.h"
+#include "vnsicommand.h"
 
 #include <errno.h>
+
 #include <fcntl.h>
 #include <kodi/DemuxPacket.h>
 #include <p8-platform/sockets/tcp.h>
 #include <p8-platform/util/timeutils.h>
-#include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 
 /* Needed on Mac OS/X */
 
@@ -31,10 +31,8 @@
 #define SOL_TCP IPPROTO_TCP
 #endif
 
-cVNSISession::cVNSISession(kodi::addon::CInstancePVRClient& instance)
-  : m_instance(instance)
+cVNSISession::cVNSISession(kodi::addon::CInstancePVRClient& instance) : m_instance(instance)
 {
-
 }
 
 cVNSISession::~cVNSISession()
@@ -71,7 +69,8 @@ bool cVNSISession::Open(const std::string& hostname, int port, const char *name)
 
   if (!m_socket->IsOpen() && !m_abort)
   {
-    kodi::Log(ADDON_LOG_DEBUG, "%s - failed to connect to the backend (%s)", __func__, m_socket->GetError().c_str());
+    kodi::Log(ADDON_LOG_DEBUG, "%s - failed to connect to the backend (%s)", __func__,
+              m_socket->GetError().c_str());
     return false;
   }
 
@@ -122,8 +121,9 @@ bool cVNSISession::Login()
 
     if (m_name.empty())
     {
-      kodi::Log(ADDON_LOG_INFO, "Logged in at '%lu+%i' to '%s' Version: '%s' with protocol version '%d'",
-                vdrTime, vdrTimeOffset, serverName, serverVersion, protocol);
+      kodi::Log(ADDON_LOG_INFO,
+                "Logged in at '%lu+%i' to '%s' Version: '%s' with protocol version '%d'", vdrTime,
+                vdrTimeOffset, serverName, serverVersion, protocol);
     }
   }
   catch (const std::out_of_range& e)
@@ -150,7 +150,7 @@ std::unique_ptr<cResponsePacket> cVNSISession::ReadMessage(int iInitialTimeout /
 
   cResponsePacket* vresp = nullptr;
 
-  if(!ReadData(reinterpret_cast<uint8_t*>(&channelID), sizeof(uint32_t), iInitialTimeout))
+  if (!ReadData(reinterpret_cast<uint8_t*>(&channelID), sizeof(uint32_t), iInitialTimeout))
     return nullptr;
 
   // Data was read
@@ -284,7 +284,7 @@ bool cVNSISession::TransmitMessage(cRequestPacket* vrp)
   if (iWriteResult != (ssize_t)vrp->getLen())
   {
     kodi::Log(ADDON_LOG_ERROR, "%s - Failed to write packet (%s), bytes written: %d of total: %d",
-                __func__, m_socket->GetError().c_str(), iWriteResult, vrp->getLen());
+              __func__, m_socket->GetError().c_str(), iWriteResult, vrp->getLen());
     return false;
   }
   return true;

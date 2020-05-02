@@ -7,14 +7,16 @@
  *  See LICENSE.md for more information.
  */
 
-#include "requestpacket.h"
-#include "tools.h"
+#include "RequestPacket.h"
+
+#include "Tools.h"
 #include "vnsicommand.h"
 
 #include <assert.h>
-#include <p8-platform/sockets/tcp.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include <p8-platform/sockets/tcp.h>
 
 uint32_t cRequestPacket::m_serialNumberCounter = 1;
 
@@ -23,7 +25,10 @@ cRequestPacket::~cRequestPacket()
   free(m_buffer);
 }
 
-void cRequestPacket::init(uint32_t topcode, bool stream, bool setUserDataLength, size_t userDataLength)
+void cRequestPacket::init(uint32_t topcode,
+                          bool stream,
+                          bool setUserDataLength,
+                          size_t userDataLength)
 {
   assert(m_buffer == nullptr);
 

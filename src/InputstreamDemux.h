@@ -9,12 +9,12 @@
 
 #pragma once
 
-#include "addon.h"
-#include "VNSISession.h"
+#include "Session.h"
 
-#include <kodi/addon-instance/PVRClient.h>
 #include <map>
 #include <string>
+
+#include <kodi/addon-instance/PVRClient.h>
 
 class cResponsePacket;
 

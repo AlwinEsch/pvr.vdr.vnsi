@@ -10,11 +10,12 @@
 #pragma once
 
 #include <atomic>
-#include <kodi/addon-instance/PVRClient.h>
 #include <memory>
-#include <p8-platform/threads/threads.h>
 #include <stdint.h>
 #include <string>
+
+#include <kodi/addon-instance/PVRClient.h>
+#include <p8-platform/threads/threads.h>
 
 class cResponsePacket;
 class cRequestPacket;

@@ -9,25 +9,31 @@
 
 #pragma once
 
-#include "VNSISession.h"
-#include "addon.h"
+#include "Session.h"
+
+#include <map>
+#include <string>
 
 #include <kodi/addon-instance/PVRClient.h>
-#include <string>
-#include <map>
 
+class CPVRAddon;
 class cResponsePacket;
 class cRequestPacket;
 class cVNSIDemux;
 class cVNSIRecording;
 
-class ATTRIBUTE_HIDDEN cVNSIData : public kodi::addon::CInstancePVRClient, public cVNSISession, public P8PLATFORM::CThread
+class ATTRIBUTE_HIDDEN CVNSIClientInstance : public kodi::addon::CInstancePVRClient,
+                                             public cVNSISession,
+                                             public P8PLATFORM::CThread
 {
 public:
-  cVNSIData(const CPVRAddon& base, KODI_HANDLE instance, const std::string& kodiVersion);
-  ~cVNSIData() override;
+  CVNSIClientInstance(const CPVRAddon& base, KODI_HANDLE instance, const std::string& kodiVersion);
+  ~CVNSIClientInstance() override;
 
-  bool Start(const std::string& hostname, int port, const char* name = nullptr, const std::string& mac = "");
+  bool Start(const std::string& hostname,
+             int port,
+             const char* name = nullptr,
+             const std::string& mac = "");
 
   PVR_ERROR GetCapabilities(kodi::addon::PVRCapabilities& capabilities) override;
 
@@ -55,12 +61,18 @@ public:
   //--==----==----==----==----==----==----==----==----==----==----==----==----==
 
   int GetChannelGroupsAmount() override;
-  PVR_ERROR GetChannelGroups(bool radio, std::vector<kodi::addon::PVRChannelGroup>& groups) override;
-  PVR_ERROR GetChannelGroupMembers(const kodi::addon::PVRChannelGroup& group, std::vector<kodi::addon::PVRChannelGroupMember>& members) override;
+  PVR_ERROR GetChannelGroups(bool radio,
+                             std::vector<kodi::addon::PVRChannelGroup>& groups) override;
+  PVR_ERROR GetChannelGroupMembers(
+      const kodi::addon::PVRChannelGroup& group,
+      std::vector<kodi::addon::PVRChannelGroupMember>& members) override;
 
   //--==----==----==----==----==----==----==----==----==----==----==----==----==
 
-  PVR_ERROR GetEPGForChannel(int channelUid, time_t start, time_t end, std::vector<kodi::addon::PVREPGTag>& epg) override;
+  PVR_ERROR GetEPGForChannel(int channelUid,
+                             time_t start,
+                             time_t end,
+                             std::vector<kodi::addon::PVREPGTag>& epg) override;
 
   //--==----==----==----==----==----==----==----==----==----==----==----==----==
 
@@ -74,12 +86,14 @@ public:
   //--==----==----==----==----==----==----==----==----==----==----==----==----==
 
   int GetRecordingsAmount(bool deleted) override;
-  PVR_ERROR GetRecordings(bool deleted, std::vector<kodi::addon::PVRRecording>& recordings) override;
+  PVR_ERROR GetRecordings(bool deleted,
+                          std::vector<kodi::addon::PVRRecording>& recordings) override;
   PVR_ERROR DeleteRecording(const kodi::addon::PVRRecording& recording) override;
   PVR_ERROR UndeleteRecording(const kodi::addon::PVRRecording& recording) override;
   PVR_ERROR DeleteAllRecordingsFromTrash() override;
   PVR_ERROR RenameRecording(const kodi::addon::PVRRecording& recording) override;
-  PVR_ERROR GetRecordingEdl(const kodi::addon::PVRRecording& recording, std::vector<kodi::addon::PVREDLEntry>& edl) override;
+  PVR_ERROR GetRecordingEdl(const kodi::addon::PVRRecording& recording,
+                            std::vector<kodi::addon::PVREDLEntry>& edl) override;
 
   //--==----==----==----==----==----==----==----==----==----==----==----==----==
 
@@ -106,8 +120,8 @@ public:
   //--==----==----==----==----==----==----==----==----==----==----==----==----==
 
 protected:
-  void *Process(void) override;
-  bool OnResponsePacket(cResponsePacket *pkt);
+  void* Process(void) override;
+  virtual bool OnResponsePacket(cResponsePacket* pkt);
 
   void OnDisconnect() override;
   void OnReconnect() override;
@@ -118,7 +132,8 @@ private:
   bool EnableStatusInterface(bool onOff, bool wait = true);
   PVR_ERROR GetAvailableRecordings(std::vector<kodi::addon::PVRRecording>& recordings);
   PVR_ERROR GetDeletedRecordings(std::vector<kodi::addon::PVRRecording>& recordings);
-  bool GenTimerChildren(const kodi::addon::PVRTimer& timer, std::vector<kodi::addon::PVRTimer>& timers);
+  bool GenTimerChildren(const kodi::addon::PVRTimer& timer,
+                        std::vector<kodi::addon::PVRTimer>& timers);
   std::string GenTimerFolder(std::string directory, std::string title);
   PVR_ERROR GetTimerInfo(unsigned int timernumber, kodi::addon::PVRTimer& tag);
   PVR_ERROR RenameTimer(const kodi::addon::PVRTimer& timerinfo, const std::string& newname);
@@ -138,10 +153,9 @@ private:
     P8PLATFORM::CMutex m_mutex;
 
   public:
-    SMessage &Enqueue(uint32_t serial);
-    std::unique_ptr<cResponsePacket> Dequeue(uint32_t serial,
-                                             SMessage &message);
-    void Set(std::unique_ptr<cResponsePacket> &&vresp);
+    SMessage& Enqueue(uint32_t serial);
+    std::unique_ptr<cResponsePacket> Dequeue(uint32_t serial, SMessage& message);
+    void Set(std::unique_ptr<cResponsePacket>&& vresp);
   };
 
   Queue m_queue;

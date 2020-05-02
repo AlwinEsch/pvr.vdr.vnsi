@@ -9,8 +9,7 @@
 
 #pragma once
 
-#include "VNSISession.h"
-#include "addon.h"
+#include "Session.h"
 
 #include <kodi/addon-instance/PVRClient.h>
 
@@ -33,7 +32,6 @@ protected:
   void GetLength();
 
 private:
-
   kodi::addon::PVRRecording m_recinfo;
   uint64_t m_currentPlayingRecordBytes = 0;
   uint64_t m_currentPlayingRecordLengthMSec = 0;

@@ -7,20 +7,20 @@
  *  See LICENSE.md for more information.
  */
 
-#include "responsepacket.h"
-#include "tools.h"
-#include "vnsicommand.h"
-#include "VNSIData.h"
+#include "ResponsePacket.h"
 
-#include <p8-platform/sockets/tcp.h>
+#include "ClientInstance.h"
+#include "Tools.h"
+#include "vnsicommand.h"
+
 #include <stdexcept>
 #include <stdlib.h>
 #include <string.h>
 
-cResponsePacket::cResponsePacket(kodi::addon::CInstancePVRClient& instance)
-  : m_instance(instance)
-{
+#include <p8-platform/sockets/tcp.h>
 
+cResponsePacket::cResponsePacket(kodi::addon::CInstancePVRClient& instance) : m_instance(instance)
+{
 }
 
 cResponsePacket::~cResponsePacket()
@@ -34,7 +34,8 @@ cResponsePacket::~cResponsePacket()
   }
 }
 
-void cResponsePacket::getOSDData(uint32_t &wnd, uint32_t &color, uint32_t &x0, uint32_t &y0, uint32_t &x1, uint32_t &y1)
+void cResponsePacket::getOSDData(
+    uint32_t& wnd, uint32_t& color, uint32_t& x0, uint32_t& y0, uint32_t& x1, uint32_t& y1)
 {
   wnd = m_osdWnd;
   color = m_osdColor;
@@ -105,7 +106,7 @@ void cResponsePacket::extractStreamHeader()
   m_duration = extract_U32();
   m_pts = extract_U64();
   m_dts = extract_U64();
-  m_muxSerial= extract_U32();
+  m_muxSerial = extract_U32();
 
   m_userDataLength = extract_U32();
 
@@ -133,7 +134,7 @@ void cResponsePacket::extractOSDHeader()
 
 char* cResponsePacket::extract_String()
 {
-  char* p = (char *)&m_userData[m_packetPos];
+  char* p = (char*)&m_userData[m_packetPos];
   const char* end = static_cast<const char*>(memchr(p, '\0', m_userDataLength - m_packetPos));
   if (end == nullptr)
     /* string is not terminated - fail */
@@ -183,7 +184,7 @@ double cResponsePacket::extract_Double()
   memcpy(&ull, &m_userData[m_packetPos], sizeof(uint64_t));
   ull = ntohll(ull);
   double d;
-  memcpy(&d,&ull,sizeof(double));
+  memcpy(&d, &ull, sizeof(double));
   m_packetPos += sizeof(uint64_t);
   return d;
 }

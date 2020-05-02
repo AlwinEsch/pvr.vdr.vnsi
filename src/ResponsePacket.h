@@ -9,10 +9,11 @@
 
 #pragma once
 
-#include <kodi/addon-instance/PVRClient.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+
+#include <kodi/addon-instance/PVRClient.h>
 
 class ATTRIBUTE_HIDDEN cResponsePacket
 {
@@ -40,7 +41,8 @@ public:
   int64_t getDTS() const { return m_dts; }
   int64_t getPTS() const { return m_pts; }
   uint32_t getMuxSerial() const { return m_muxSerial; }
-  void getOSDData(uint32_t &wnd, uint32_t &color, uint32_t &x0, uint32_t &y0, uint32_t &x1, uint32_t &y1);
+  void getOSDData(
+      uint32_t& wnd, uint32_t& color, uint32_t& x0, uint32_t& y0, uint32_t& x1, uint32_t& y1);
 
   size_t getPacketPos() const { return m_packetPos; }
   size_t getRemainingLength() const { return m_userDataLength - m_packetPos; }
@@ -61,7 +63,7 @@ public:
   uint8_t* getHeader() { return m_header; };
   size_t getStreamHeaderLength() const { return 36; };
   size_t getHeaderLength() const { return 8; };
-  size_t getOSDHeaderLength() const { return 32; } ;
+  size_t getOSDHeaderLength() const { return 32; };
 
 private:
   uint8_t m_header[40];

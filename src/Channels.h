@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "VNSIData.h"
+#include "ClientInstance.h"
 
 #include <map>
 #include <string>

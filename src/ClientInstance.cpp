@@ -7,20 +7,24 @@
  *  See LICENSE.md for more information.
  */
 
-#include "VNSIData.h"
-#include "VNSIDemux.h"
-#include "VNSIRecording.h"
-#include "responsepacket.h"
-#include "requestpacket.h"
-#include "vnsicommand.h"
+#include "ClientInstance.h"
+
+#include "GUIWindowAdmin.h"
+#include "GUIWindowChannelScan.h"
+#include "InputstreamDemux.h"
+#include "InputstreamRecording.h"
+#include "RequestPacket.h"
+#include "ResponsePacket.h"
 #include "Settings.h"
+#include "vnsicommand.h"
 
 #include <algorithm>
+#include <string.h>
+#include <time.h>
+
 #include <kodi/General.h>
 #include <kodi/Network.h>
 #include <p8-platform/util/StringUtils.h>
-#include <string.h>
-#include <time.h>
 
 // helper functions (taken from VDR)
 
@@ -54,20 +58,21 @@ time_t SetTime(time_t t, int secondsFromMidnight)
   struct tm tm = *localtime(&t);
   tm.tm_hour = secondsFromMidnight / 3600;
   tm.tm_min = (secondsFromMidnight % 3600) / 60;
-  tm.tm_sec =  secondsFromMidnight % 60;
+  tm.tm_sec = secondsFromMidnight % 60;
   tm.tm_isdst = -1; // makes sure mktime() will determine the correct DST setting
   return mktime(&tm);
 }
 
 } /* namespace */
 
-cVNSIData::SMessage& cVNSIData::Queue::Enqueue(uint32_t serial)
+CVNSIClientInstance::SMessage& CVNSIClientInstance::Queue::Enqueue(uint32_t serial)
 {
   const P8PLATFORM::CLockObject lock(m_mutex);
   return m_queue[serial];
 }
 
-std::unique_ptr<cResponsePacket> cVNSIData::Queue::Dequeue(uint32_t serial, SMessage &message)
+std::unique_ptr<cResponsePacket> CVNSIClientInstance::Queue::Dequeue(uint32_t serial,
+                                                                     SMessage& message)
 {
   const P8PLATFORM::CLockObject lock(m_mutex);
   auto vresp = std::move(message.pkt);
@@ -75,47 +80,56 @@ std::unique_ptr<cResponsePacket> cVNSIData::Queue::Dequeue(uint32_t serial, SMes
   return vresp;
 }
 
-void cVNSIData::Queue::Set(std::unique_ptr<cResponsePacket> &&vresp)
+void CVNSIClientInstance::Queue::Set(std::unique_ptr<cResponsePacket>&& vresp)
 {
   P8PLATFORM::CLockObject lock(m_mutex);
   SMessages::iterator it = m_queue.find(vresp->getRequestID());
-  if (it != m_queue.end()) {
+  if (it != m_queue.end())
+  {
     it->second.pkt = std::move(vresp);
     it->second.event.Broadcast();
   }
 }
 
-cVNSIData::cVNSIData(const CPVRAddon& base, KODI_HANDLE instance, const std::string& kodiVersion)
+CVNSIClientInstance::CVNSIClientInstance(const CPVRAddon& base,
+                                         KODI_HANDLE instance,
+                                         const std::string& kodiVersion)
   : kodi::addon::CInstancePVRClient(instance, kodiVersion),
     cVNSISession(*dynamic_cast<kodi::addon::CInstancePVRClient*>(this)),
     m_base(base)
 {
 }
 
-cVNSIData::~cVNSIData()
+CVNSIClientInstance::~CVNSIClientInstance()
 {
   m_abort = true;
   StopThread(0);
   Close();
 }
 
-void cVNSIData::OnDisconnect()
+void CVNSIClientInstance::OnDisconnect()
 {
-  kodi::addon::CInstancePVRClient::ConnectionStateChange("vnsi connection lost", PVR_CONNECTION_STATE_DISCONNECTED, kodi::GetLocalizedString(30044));
+  kodi::addon::CInstancePVRClient::ConnectionStateChange(
+      "vnsi connection lost", PVR_CONNECTION_STATE_DISCONNECTED, kodi::GetLocalizedString(30044));
 }
 
-void cVNSIData::OnReconnect()
+void CVNSIClientInstance::OnReconnect()
 {
   EnableStatusInterface(true, false);
 
-  kodi::addon::CInstancePVRClient::ConnectionStateChange("vnsi connection established", PVR_CONNECTION_STATE_CONNECTED, kodi::GetLocalizedString(30045));
+  kodi::addon::CInstancePVRClient::ConnectionStateChange("vnsi connection established",
+                                                         PVR_CONNECTION_STATE_CONNECTED,
+                                                         kodi::GetLocalizedString(30045));
 
   kodi::addon::CInstancePVRClient::TriggerChannelUpdate();
   kodi::addon::CInstancePVRClient::TriggerTimerUpdate();
   kodi::addon::CInstancePVRClient::TriggerRecordingUpdate();
 }
 
-bool cVNSIData::Start(const std::string& hostname, int port, const char* name, const std::string& mac)
+bool CVNSIClientInstance::Start(const std::string& hostname,
+                                int port,
+                                const char* name,
+                                const std::string& mac)
 {
   m_hostname = hostname;
   m_port = port;
@@ -124,7 +138,8 @@ bool cVNSIData::Start(const std::string& hostname, int port, const char* name, c
   if (name != nullptr)
     m_name = name;
 
-  kodi::addon::CInstancePVRClient::ConnectionStateChange("VNSI started", PVR_CONNECTION_STATE_CONNECTING, "VNSI started");
+  kodi::addon::CInstancePVRClient::ConnectionStateChange(
+      "VNSI started", PVR_CONNECTION_STATE_CONNECTING, "VNSI started");
 
   m_abort = false;
   m_connectionLost = true;
@@ -139,7 +154,7 @@ bool cVNSIData::Start(const std::string& hostname, int port, const char* name, c
   return true;
 }
 
-bool cVNSIData::SupportChannelScan()
+bool CVNSIClientInstance::SupportChannelScan()
 {
   cRequestPacket vrp;
   vrp.init(VNSI_SCAN_SUPPORTED);
@@ -155,7 +170,7 @@ bool cVNSIData::SupportChannelScan()
   return ret == VNSI_RET_OK ? true : false;
 }
 
-bool cVNSIData::SupportRecordingsUndelete()
+bool CVNSIClientInstance::SupportRecordingsUndelete()
 {
   if (GetProtocol() > 7)
   {
@@ -173,11 +188,12 @@ bool cVNSIData::SupportRecordingsUndelete()
     return ret == VNSI_RET_OK ? true : false;
   }
 
-  kodi::Log(ADDON_LOG_INFO, "%s - Undelete not supported on backend (min. Ver. 1.3.0; Protocol 7)", __func__);
+  kodi::Log(ADDON_LOG_INFO, "%s - Undelete not supported on backend (min. Ver. 1.3.0; Protocol 7)",
+            __func__);
   return false;
 }
 
-PVR_ERROR cVNSIData::GetCapabilities(kodi::addon::PVRCapabilities& capabilities)
+PVR_ERROR CVNSIClientInstance::GetCapabilities(kodi::addon::PVRCapabilities& capabilities)
 {
   capabilities.SetSupportsEPG(true);
   capabilities.SetSupportsRecordings(true);
@@ -199,27 +215,27 @@ PVR_ERROR cVNSIData::GetCapabilities(kodi::addon::PVRCapabilities& capabilities)
   return PVR_ERROR_NO_ERROR;
 }
 
-std::string cVNSIData::GetBackendName()
+std::string CVNSIClientInstance::GetBackendName()
 {
   return GetServerName();
 }
 
-std::string cVNSIData::GetBackendVersion()
+std::string CVNSIClientInstance::GetBackendVersion()
 {
   return GetVersion() + "(Protocol: " + std::to_string(GetProtocol()) + ")";
 }
 
-std::string cVNSIData::GetBackendHostname()
+std::string CVNSIClientInstance::GetBackendHostname()
 {
   return m_hostname;
 }
 
-std::string cVNSIData::GetConnectionString()
+std::string CVNSIClientInstance::GetConnectionString()
 {
   return m_hostname + ":" + std::to_string(m_port);
 }
 
-PVR_ERROR cVNSIData::GetDriveSpace(uint64_t& total, uint64_t& used)
+PVR_ERROR CVNSIClientInstance::GetDriveSpace(uint64_t& total, uint64_t& used)
 {
   cRequestPacket vrp;
   vrp.init(VNSI_RECORDINGS_DISKSIZE);
@@ -236,53 +252,53 @@ PVR_ERROR cVNSIData::GetDriveSpace(uint64_t& total, uint64_t& used)
   /* vresp->extract_U32()); percent not used */
 
   total = totalspace;
-  used  = (totalspace - freespace);
+  used = (totalspace - freespace);
 
   /* Convert from kBytes to Bytes */
   total *= 1024;
-  used  *= 1024;
+  used *= 1024;
 
   return PVR_ERROR_NO_ERROR;
 }
 
-PVR_ERROR cVNSIData::CallSettingsMenuHook(const kodi::addon::PVRMenuhook& menuhook)
+PVR_ERROR CVNSIClientInstance::CallSettingsMenuHook(const kodi::addon::PVRMenuhook& menuhook)
 {
   try
   {
     if (menuhook.GetHookId() == 1)
     {
-//       cVNSIAdmin osd;
-//       osd.Open(m_hostname, m_port);
+      cVNSIAdmin osd(*this);
+      osd.Open(m_hostname, m_port, m_wolMac);
     }
     return PVR_ERROR_NO_ERROR;
   }
   catch (std::exception e)
   {
-    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __FUNCTION__, e.what());
+    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __func__, e.what());
     return PVR_ERROR_SERVER_ERROR;
   }
 }
 
-PVR_ERROR cVNSIData::OpenDialogChannelScan()
+PVR_ERROR CVNSIClientInstance::OpenDialogChannelScan()
 {
   try
   {
-//     cVNSIChannelScan scanner;
-//     scanner.Open(m_hostname, m_port);
+    cVNSIChannelScan scanner(*this);
+    scanner.Open(m_hostname, m_port, m_wolMac);
     return PVR_ERROR_NO_ERROR;
   }
   catch (std::exception e)
   {
-    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __FUNCTION__, e.what());
+    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __func__, e.what());
     return PVR_ERROR_SERVER_ERROR;
   }
 }
 
-void cVNSIData::OnSystemSleep()
+void CVNSIClientInstance::OnSystemSleep()
 {
 }
 
-void cVNSIData::OnSystemWake()
+void CVNSIClientInstance::OnSystemWake()
 {
   if (!m_wolMac.empty())
   {
@@ -290,18 +306,18 @@ void cVNSIData::OnSystemWake()
   }
 }
 
-void cVNSIData::OnPowerSavingActivated()
+void CVNSIClientInstance::OnPowerSavingActivated()
 {
 }
 
-void cVNSIData::OnPowerSavingDeactivated()
+void CVNSIClientInstance::OnPowerSavingDeactivated()
 {
 }
 
 /*******************************************/
 /** PVR Channel Functions                 **/
 
-int cVNSIData::GetChannelsAmount()
+int CVNSIClientInstance::GetChannelsAmount()
 {
   try
   {
@@ -320,12 +336,13 @@ int cVNSIData::GetChannelsAmount()
   }
   catch (std::exception e)
   {
-    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __FUNCTION__, e.what());
+    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __func__, e.what());
     return 0;
   }
 }
 
-PVR_ERROR cVNSIData::GetChannels(bool radio, std::vector<kodi::addon::PVRChannel>& channels)
+PVR_ERROR CVNSIClientInstance::GetChannels(bool radio,
+                                           std::vector<kodi::addon::PVRChannel>& channels)
 {
   try
   {
@@ -346,19 +363,18 @@ PVR_ERROR cVNSIData::GetChannels(bool radio, std::vector<kodi::addon::PVRChannel
       kodi::addon::PVRChannel tag;
 
       tag.SetChannelNumber(vresp->extract_U32());
-      char *strChannelName  = vresp->extract_String();
-      tag.SetChannelName(strChannelName);
-      char *strProviderName = vresp->extract_String();
+      tag.SetChannelName(vresp->extract_String());
+      char* strProviderName = vresp->extract_String();
       tag.SetUniqueId(vresp->extract_U32());
       tag.SetEncryptionSystem(vresp->extract_U32());
-      char *strCaids = vresp->extract_String();
+      char* strCaids = vresp->extract_String();
       if (m_protocol >= 6)
       {
         std::string path = CVNSISettings::Get().GetIconPath();
         std::string ref = vresp->extract_String();
         if (!path.empty())
         {
-          if (path[path.length()-1] != '/')
+          if (path[path.length() - 1] != '/')
             path += '/';
           path += ref;
           path += ".png";
@@ -374,12 +390,13 @@ PVR_ERROR cVNSIData::GetChannels(bool radio, std::vector<kodi::addon::PVRChannel
   }
   catch (std::exception e)
   {
-    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __FUNCTION__, e.what());
+    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __func__, e.what());
     return PVR_ERROR_SERVER_ERROR;
   }
 }
 
-PVR_ERROR cVNSIData::GetSignalStatus(int channelUid, kodi::addon::PVRSignalStatus& signalStatus)
+PVR_ERROR CVNSIClientInstance::GetSignalStatus(int channelUid,
+                                               kodi::addon::PVRSignalStatus& signalStatus)
 {
   if (!m_demuxer)
     return PVR_ERROR_SERVER_ERROR;
@@ -390,7 +407,7 @@ PVR_ERROR cVNSIData::GetSignalStatus(int channelUid, kodi::addon::PVRSignalStatu
   }
   catch (std::exception e)
   {
-    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __FUNCTION__, e.what());
+    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __func__, e.what());
     return PVR_ERROR_SERVER_ERROR;
   }
 }
@@ -398,7 +415,7 @@ PVR_ERROR cVNSIData::GetSignalStatus(int channelUid, kodi::addon::PVRSignalStatu
 /*******************************************/
 /** PVR Channelgroups Functions           **/
 
-int cVNSIData::GetChannelGroupsAmount()
+int CVNSIClientInstance::GetChannelGroupsAmount()
 {
   try
   {
@@ -418,12 +435,13 @@ int cVNSIData::GetChannelGroupsAmount()
   }
   catch (std::exception e)
   {
-    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __FUNCTION__, e.what());
+    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __func__, e.what());
     return PVR_ERROR_SERVER_ERROR;
   }
 }
 
-PVR_ERROR cVNSIData::GetChannelGroups(bool radio, std::vector<kodi::addon::PVRChannelGroup>& groups)
+PVR_ERROR CVNSIClientInstance::GetChannelGroups(bool radio,
+                                                std::vector<kodi::addon::PVRChannelGroup>& groups)
 {
   try
   {
@@ -443,8 +461,7 @@ PVR_ERROR cVNSIData::GetChannelGroups(bool radio, std::vector<kodi::addon::PVRCh
       {
         kodi::addon::PVRChannelGroup tag;
 
-        char *strGroupName = vresp->extract_String();
-        tag.SetGroupName(strGroupName);
+        tag.SetGroupName(vresp->extract_String());
         tag.SetIsRadio(vresp->extract_U8() != 0 ? true : false);
         tag.SetPosition(0);
 
@@ -456,13 +473,14 @@ PVR_ERROR cVNSIData::GetChannelGroups(bool radio, std::vector<kodi::addon::PVRCh
   }
   catch (std::exception e)
   {
-    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __FUNCTION__, e.what());
+    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __func__, e.what());
     return PVR_ERROR_SERVER_ERROR;
   }
 }
 
-PVR_ERROR cVNSIData::GetChannelGroupMembers(const kodi::addon::PVRChannelGroup& group,
-                                            std::vector<kodi::addon::PVRChannelGroupMember>& members)
+PVR_ERROR CVNSIClientInstance::GetChannelGroupMembers(
+    const kodi::addon::PVRChannelGroup& group,
+    std::vector<kodi::addon::PVRChannelGroupMember>& members)
 {
   try
   {
@@ -493,7 +511,7 @@ PVR_ERROR cVNSIData::GetChannelGroupMembers(const kodi::addon::PVRChannelGroup& 
   }
   catch (std::exception e)
   {
-    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __FUNCTION__, e.what());
+    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __func__, e.what());
     return PVR_ERROR_SERVER_ERROR;
   }
 }
@@ -501,7 +519,10 @@ PVR_ERROR cVNSIData::GetChannelGroupMembers(const kodi::addon::PVRChannelGroup& 
 /*******************************************/
 /** PVR EPG Functions                     **/
 
-PVR_ERROR cVNSIData::GetEPGForChannel(int channelUid, time_t start, time_t end, std::vector<kodi::addon::PVREPGTag>& epg)
+PVR_ERROR CVNSIClientInstance::GetEPGForChannel(int channelUid,
+                                                time_t start,
+                                                time_t end,
+                                                std::vector<kodi::addon::PVREPGTag>& epg)
 {
   try
   {
@@ -554,7 +575,7 @@ PVR_ERROR cVNSIData::GetEPGForChannel(int channelUid, time_t start, time_t end, 
   }
   catch (std::exception e)
   {
-    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __FUNCTION__, e.what());
+    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __func__, e.what());
     return PVR_ERROR_SERVER_ERROR;
   }
 }
@@ -562,7 +583,7 @@ PVR_ERROR cVNSIData::GetEPGForChannel(int channelUid, time_t start, time_t end, 
 /*******************************************/
 /** PVR Recording Functions               **/
 
-int cVNSIData::GetRecordingsAmount(bool deleted)
+int CVNSIClientInstance::GetRecordingsAmount(bool deleted)
 {
   try
   {
@@ -581,12 +602,13 @@ int cVNSIData::GetRecordingsAmount(bool deleted)
   }
   catch (std::exception e)
   {
-    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __FUNCTION__, e.what());
+    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __func__, e.what());
     return PVR_ERROR_SERVER_ERROR;
   }
 }
 
-PVR_ERROR cVNSIData::GetRecordings(bool deleted, std::vector<kodi::addon::PVRRecording>& recordings)
+PVR_ERROR CVNSIClientInstance::GetRecordings(bool deleted,
+                                             std::vector<kodi::addon::PVRRecording>& recordings)
 {
   try
   {
@@ -599,12 +621,13 @@ PVR_ERROR cVNSIData::GetRecordings(bool deleted, std::vector<kodi::addon::PVRRec
   }
   catch (std::exception e)
   {
-    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __FUNCTION__, e.what());
+    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __func__, e.what());
     return PVR_ERROR_SERVER_ERROR;
   }
 }
 
-PVR_ERROR cVNSIData::GetAvailableRecordings(std::vector<kodi::addon::PVRRecording>& recordings)
+PVR_ERROR CVNSIClientInstance::GetAvailableRecordings(
+    std::vector<kodi::addon::PVRRecording>& recordings)
 {
   cRequestPacket vrp;
   vrp.init(VNSI_RECORDINGS_GETLIST);
@@ -628,9 +651,7 @@ PVR_ERROR cVNSIData::GetAvailableRecordings(std::vector<kodi::addon::PVRRecordin
     tag.SetIsDeleted(false);
     tag.SetSeriesNumber(PVR_RECORDING_INVALID_SERIES_EPISODE);
     tag.SetEpisodeNumber(PVR_RECORDING_INVALID_SERIES_EPISODE);
-
-    char *strChannelName = vresp->extract_String();
-    tag.SetChannelName(strChannelName);
+    tag.SetChannelName(vresp->extract_String());
     if (GetProtocol() >= 9)
     {
       tag.SetChannelUid(-1);
@@ -651,18 +672,11 @@ PVR_ERROR cVNSIData::GetAvailableRecordings(std::vector<kodi::addon::PVRRecordin
       tag.SetChannelType(PVR_RECORDING_CHANNEL_TYPE_UNKNOWN);
     }
 
-    char *strTitle = vresp->extract_String();
-    tag.SetTitle(strTitle);
-
-    char *strEpisodeName = vresp->extract_String();
-    tag.SetEpisodeName(strEpisodeName);
-    tag.SetPlotOutline(strEpisodeName);
-
-    char *strPlot = vresp->extract_String();
-    tag.SetPlot(strPlot);
-
-    char *strDirectory = vresp->extract_String();
-    tag.SetDirectory(strDirectory);
+    tag.SetTitle(vresp->extract_String());
+    tag.SetEpisodeName(vresp->extract_String());
+    tag.SetPlotOutline(tag.GetEpisodeName());
+    tag.SetPlot(vresp->extract_String());
+    tag.SetDirectory(vresp->extract_String());
     tag.SetRecordingId(StringUtils::Format("%i", vresp->extract_U32()));
 
     recordings.push_back(std::move(tag));
@@ -671,7 +685,8 @@ PVR_ERROR cVNSIData::GetAvailableRecordings(std::vector<kodi::addon::PVRRecordin
   return PVR_ERROR_NO_ERROR;
 }
 
-PVR_ERROR cVNSIData::GetDeletedRecordings(std::vector<kodi::addon::PVRRecording>& recordings)
+PVR_ERROR CVNSIClientInstance::GetDeletedRecordings(
+    std::vector<kodi::addon::PVRRecording>& recordings)
 {
   cRequestPacket vrp;
   vrp.init(VNSI_RECORDINGS_DELETED_GETLIST);
@@ -693,9 +708,7 @@ PVR_ERROR cVNSIData::GetDeletedRecordings(std::vector<kodi::addon::PVRRecording>
     tag.SetPriority(vresp->extract_U32());
     tag.SetLifetime(vresp->extract_U32());
     tag.SetIsDeleted(true);
-
-    char *strChannelName = vresp->extract_String();
-    tag.SetChannelName(strChannelName);
+    tag.SetChannelName(vresp->extract_String());
     if (GetProtocol() >= 9)
     {
       tag.SetChannelUid(vresp->extract_S32());
@@ -703,19 +716,12 @@ PVR_ERROR cVNSIData::GetDeletedRecordings(std::vector<kodi::addon::PVRRecording>
     else
       tag.SetChannelUid(PVR_CHANNEL_INVALID_UID);
 
-    char *strTitle = vresp->extract_String();
-    tag.SetTitle(strTitle);
-
-    char *strEpisodeName = vresp->extract_String();
-    tag.SetEpisodeName(strEpisodeName);
-    tag.SetPlotOutline(strEpisodeName);
-
-    char *strPlot = vresp->extract_String();
-    tag.SetPlot(strPlot);
-
-    char *strDirectory = vresp->extract_String();
-    tag.SetDirectory(strDirectory);
-    tag.SetRecordingId(StringUtils::Format("%i", vresp->extract_U32()));
+    tag.SetTitle(vresp->extract_String());
+    tag.SetEpisodeName(vresp->extract_String());
+    tag.SetPlotOutline(tag.GetEpisodeName());
+    tag.SetPlot(vresp->extract_String());
+    tag.SetDirectory(vresp->extract_String());
+    tag.SetRecordingId(std::to_string(vresp->extract_U32()));
 
     recordings.push_back(std::move(tag));
   }
@@ -723,7 +729,7 @@ PVR_ERROR cVNSIData::GetDeletedRecordings(std::vector<kodi::addon::PVRRecording>
   return PVR_ERROR_NO_ERROR;
 }
 
-PVR_ERROR cVNSIData::RenameRecording(const kodi::addon::PVRRecording& recording)
+PVR_ERROR CVNSIClientInstance::RenameRecording(const kodi::addon::PVRRecording& recording)
 {
   try
   {
@@ -746,18 +752,18 @@ PVR_ERROR cVNSIData::RenameRecording(const kodi::addon::PVRRecording& recording)
     uint32_t returnCode = vresp->extract_U32();
 
     if (returnCode != 0)
-    return PVR_ERROR_FAILED;
+      return PVR_ERROR_FAILED;
 
     return PVR_ERROR_NO_ERROR;
   }
   catch (std::exception e)
   {
-    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __FUNCTION__, e.what());
+    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __func__, e.what());
     return PVR_ERROR_SERVER_ERROR;
   }
 }
 
-PVR_ERROR cVNSIData::DeleteRecording(const kodi::addon::PVRRecording& recording)
+PVR_ERROR CVNSIClientInstance::DeleteRecording(const kodi::addon::PVRRecording& recording)
 {
   try
   {
@@ -773,7 +779,7 @@ PVR_ERROR cVNSIData::DeleteRecording(const kodi::addon::PVRRecording& recording)
 
     uint32_t returnCode = vresp->extract_U32();
 
-    switch(returnCode)
+    switch (returnCode)
     {
       case VNSI_RET_DATALOCKED:
         return PVR_ERROR_FAILED;
@@ -792,12 +798,12 @@ PVR_ERROR cVNSIData::DeleteRecording(const kodi::addon::PVRRecording& recording)
   }
   catch (std::exception e)
   {
-    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __FUNCTION__, e.what());
+    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __func__, e.what());
     return PVR_ERROR_SERVER_ERROR;
   }
 }
 
-PVR_ERROR cVNSIData::UndeleteRecording(const kodi::addon::PVRRecording& recording)
+PVR_ERROR CVNSIClientInstance::UndeleteRecording(const kodi::addon::PVRRecording& recording)
 {
   try
   {
@@ -812,7 +818,7 @@ PVR_ERROR cVNSIData::UndeleteRecording(const kodi::addon::PVRRecording& recordin
     }
 
     uint32_t returnCode = vresp->extract_U32();
-    switch(returnCode)
+    switch (returnCode)
     {
       case VNSI_RET_DATALOCKED:
         return PVR_ERROR_FAILED;
@@ -831,12 +837,12 @@ PVR_ERROR cVNSIData::UndeleteRecording(const kodi::addon::PVRRecording& recordin
   }
   catch (std::exception e)
   {
-    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __FUNCTION__, e.what());
+    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __func__, e.what());
     return PVR_ERROR_SERVER_ERROR;
   }
 }
 
-PVR_ERROR cVNSIData::DeleteAllRecordingsFromTrash()
+PVR_ERROR CVNSIClientInstance::DeleteAllRecordingsFromTrash()
 {
   try
   {
@@ -850,7 +856,7 @@ PVR_ERROR cVNSIData::DeleteAllRecordingsFromTrash()
     }
 
     uint32_t returnCode = vresp->extract_U32();
-    switch(returnCode)
+    switch (returnCode)
     {
       case VNSI_RET_DATALOCKED:
         return PVR_ERROR_FAILED;
@@ -869,12 +875,13 @@ PVR_ERROR cVNSIData::DeleteAllRecordingsFromTrash()
   }
   catch (std::exception e)
   {
-    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __FUNCTION__, e.what());
+    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __func__, e.what());
     return PVR_ERROR_SERVER_ERROR;
   }
 }
 
-PVR_ERROR cVNSIData::GetRecordingEdl(const kodi::addon::PVRRecording& recording, std::vector<kodi::addon::PVREDLEntry>& edl)
+PVR_ERROR CVNSIClientInstance::GetRecordingEdl(const kodi::addon::PVRRecording& recording,
+                                               std::vector<kodi::addon::PVREDLEntry>& edl)
 {
   try
   {
@@ -894,8 +901,7 @@ PVR_ERROR cVNSIData::GetRecordingEdl(const kodi::addon::PVRRecording& recording,
       return PVR_ERROR_NO_ERROR;
     }
 
-    while (vresp->getRemainingLength() >= 2 * 8 + 4 &&
-           size++ < PVR_ADDON_EDL_LENGTH)
+    while (vresp->getRemainingLength() >= 2 * 8 + 4 && size++ < PVR_ADDON_EDL_LENGTH)
     {
       kodi::addon::PVREDLEntry entry;
 
@@ -910,7 +916,7 @@ PVR_ERROR cVNSIData::GetRecordingEdl(const kodi::addon::PVRRecording& recording,
   }
   catch (std::exception e)
   {
-    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __FUNCTION__, e.what());
+    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __func__, e.what());
     return PVR_ERROR_SERVER_ERROR;
   }
 }
@@ -919,7 +925,7 @@ PVR_ERROR cVNSIData::GetRecordingEdl(const kodi::addon::PVRRecording& recording,
 /*******************************************/
 /** PVR Timer Functions                   **/
 
-PVR_ERROR cVNSIData::GetTimerTypes(std::vector<kodi::addon::PVRTimerType>& types)
+PVR_ERROR CVNSIClientInstance::GetTimerTypes(std::vector<kodi::addon::PVRTimerType>& types)
 {
   try
   {
@@ -929,13 +935,10 @@ PVR_ERROR cVNSIData::GetTimerTypes(std::vector<kodi::addon::PVRTimerType>& types
 
       type.SetId(VNSI_TIMER_TYPE_MAN);
       type.SetDescription(kodi::GetLocalizedString(30200));
-      type.SetAttributes(PVR_TIMER_TYPE_IS_MANUAL               |
-                         PVR_TIMER_TYPE_SUPPORTS_ENABLE_DISABLE |
-                         PVR_TIMER_TYPE_SUPPORTS_CHANNELS       |
-                         PVR_TIMER_TYPE_SUPPORTS_START_TIME     |
-                         PVR_TIMER_TYPE_SUPPORTS_END_TIME       |
-                         PVR_TIMER_TYPE_SUPPORTS_PRIORITY       |
-                         PVR_TIMER_TYPE_SUPPORTS_LIFETIME       |
+      type.SetAttributes(PVR_TIMER_TYPE_IS_MANUAL | PVR_TIMER_TYPE_SUPPORTS_ENABLE_DISABLE |
+                         PVR_TIMER_TYPE_SUPPORTS_CHANNELS | PVR_TIMER_TYPE_SUPPORTS_START_TIME |
+                         PVR_TIMER_TYPE_SUPPORTS_END_TIME | PVR_TIMER_TYPE_SUPPORTS_PRIORITY |
+                         PVR_TIMER_TYPE_SUPPORTS_LIFETIME |
                          PVR_TIMER_TYPE_SUPPORTS_RECORDING_FOLDERS);
 
       types.push_back(std::move(type));
@@ -947,16 +950,11 @@ PVR_ERROR cVNSIData::GetTimerTypes(std::vector<kodi::addon::PVRTimerType>& types
 
       type.SetId(VNSI_TIMER_TYPE_MAN_REPEAT);
       type.SetDescription(kodi::GetLocalizedString(30201));
-      type.SetAttributes(PVR_TIMER_TYPE_IS_MANUAL               |
-                         PVR_TIMER_TYPE_IS_REPEATING            |
-                         PVR_TIMER_TYPE_SUPPORTS_ENABLE_DISABLE |
-                         PVR_TIMER_TYPE_SUPPORTS_CHANNELS       |
-                         PVR_TIMER_TYPE_SUPPORTS_START_TIME     |
-                         PVR_TIMER_TYPE_SUPPORTS_END_TIME       |
-                         PVR_TIMER_TYPE_SUPPORTS_PRIORITY       |
-                         PVR_TIMER_TYPE_SUPPORTS_LIFETIME       |
-                         PVR_TIMER_TYPE_SUPPORTS_FIRST_DAY      |
-                         PVR_TIMER_TYPE_SUPPORTS_WEEKDAYS       |
+      type.SetAttributes(PVR_TIMER_TYPE_IS_MANUAL | PVR_TIMER_TYPE_IS_REPEATING |
+                         PVR_TIMER_TYPE_SUPPORTS_ENABLE_DISABLE | PVR_TIMER_TYPE_SUPPORTS_CHANNELS |
+                         PVR_TIMER_TYPE_SUPPORTS_START_TIME | PVR_TIMER_TYPE_SUPPORTS_END_TIME |
+                         PVR_TIMER_TYPE_SUPPORTS_PRIORITY | PVR_TIMER_TYPE_SUPPORTS_LIFETIME |
+                         PVR_TIMER_TYPE_SUPPORTS_FIRST_DAY | PVR_TIMER_TYPE_SUPPORTS_WEEKDAYS |
                          PVR_TIMER_TYPE_SUPPORTS_RECORDING_FOLDERS);
 
       types.push_back(std::move(type));
@@ -968,13 +966,10 @@ PVR_ERROR cVNSIData::GetTimerTypes(std::vector<kodi::addon::PVRTimerType>& types
 
       type.SetId(VNSI_TIMER_TYPE_MAN_REPEAT_CHILD);
       type.SetDescription(kodi::GetLocalizedString(30205));
-      type.SetAttributes(PVR_TIMER_TYPE_IS_MANUAL               |
-                         PVR_TIMER_TYPE_IS_READONLY             |
-                         PVR_TIMER_TYPE_SUPPORTS_CHANNELS       |
-                         PVR_TIMER_TYPE_SUPPORTS_START_TIME     |
-                         PVR_TIMER_TYPE_SUPPORTS_END_TIME       |
-                         PVR_TIMER_TYPE_SUPPORTS_PRIORITY       |
-                         PVR_TIMER_TYPE_SUPPORTS_LIFETIME       |
+      type.SetAttributes(PVR_TIMER_TYPE_IS_MANUAL | PVR_TIMER_TYPE_IS_READONLY |
+                         PVR_TIMER_TYPE_SUPPORTS_CHANNELS | PVR_TIMER_TYPE_SUPPORTS_START_TIME |
+                         PVR_TIMER_TYPE_SUPPORTS_END_TIME | PVR_TIMER_TYPE_SUPPORTS_PRIORITY |
+                         PVR_TIMER_TYPE_SUPPORTS_LIFETIME |
                          PVR_TIMER_TYPE_SUPPORTS_RECORDING_FOLDERS);
 
       types.push_back(std::move(type));
@@ -986,14 +981,11 @@ PVR_ERROR cVNSIData::GetTimerTypes(std::vector<kodi::addon::PVRTimerType>& types
 
       type.SetId(VNSI_TIMER_TYPE_EPG);
       type.SetDescription(kodi::GetLocalizedString(30202));
-      type.SetAttributes(PVR_TIMER_TYPE_SUPPORTS_ENABLE_DISABLE    |
-                         PVR_TIMER_TYPE_REQUIRES_EPG_TAG_ON_CREATE |
-                         PVR_TIMER_TYPE_SUPPORTS_CHANNELS          |
-                         PVR_TIMER_TYPE_SUPPORTS_START_TIME        |
-                         PVR_TIMER_TYPE_SUPPORTS_END_TIME          |
-                         PVR_TIMER_TYPE_SUPPORTS_PRIORITY          |
-                         PVR_TIMER_TYPE_SUPPORTS_LIFETIME          |
-                         PVR_TIMER_TYPE_SUPPORTS_RECORDING_FOLDERS);
+      type.SetAttributes(
+          PVR_TIMER_TYPE_SUPPORTS_ENABLE_DISABLE | PVR_TIMER_TYPE_REQUIRES_EPG_TAG_ON_CREATE |
+          PVR_TIMER_TYPE_SUPPORTS_CHANNELS | PVR_TIMER_TYPE_SUPPORTS_START_TIME |
+          PVR_TIMER_TYPE_SUPPORTS_END_TIME | PVR_TIMER_TYPE_SUPPORTS_PRIORITY |
+          PVR_TIMER_TYPE_SUPPORTS_LIFETIME | PVR_TIMER_TYPE_SUPPORTS_RECORDING_FOLDERS);
 
       types.push_back(std::move(type));
     }
@@ -1018,12 +1010,10 @@ PVR_ERROR cVNSIData::GetTimerTypes(std::vector<kodi::addon::PVRTimerType>& types
 
         type.SetId(VNSI_TIMER_TYPE_EPG_SEARCH);
         type.SetDescription(kodi::GetLocalizedString(30204));
-        type.SetAttributes(PVR_TIMER_TYPE_IS_REPEATING |
-                           PVR_TIMER_TYPE_SUPPORTS_ENABLE_DISABLE |
+        type.SetAttributes(PVR_TIMER_TYPE_IS_REPEATING | PVR_TIMER_TYPE_SUPPORTS_ENABLE_DISABLE |
                            PVR_TIMER_TYPE_SUPPORTS_CHANNELS |
                            PVR_TIMER_TYPE_SUPPORTS_TITLE_EPG_MATCH |
-                           PVR_TIMER_TYPE_SUPPORTS_PRIORITY |
-                           PVR_TIMER_TYPE_SUPPORTS_LIFETIME);
+                           PVR_TIMER_TYPE_SUPPORTS_PRIORITY | PVR_TIMER_TYPE_SUPPORTS_LIFETIME);
         types.push_back(std::move(type));
       }
 
@@ -1032,13 +1022,10 @@ PVR_ERROR cVNSIData::GetTimerTypes(std::vector<kodi::addon::PVRTimerType>& types
 
       type.SetId(VNSI_TIMER_TYPE_VPS);
       type.SetDescription(kodi::GetLocalizedString(30203));
-      type.SetAttributes(PVR_TIMER_TYPE_IS_MANUAL |
-                         PVR_TIMER_TYPE_SUPPORTS_ENABLE_DISABLE |
-                         PVR_TIMER_TYPE_SUPPORTS_CHANNELS       |
-                         PVR_TIMER_TYPE_SUPPORTS_START_TIME     |
-                         PVR_TIMER_TYPE_SUPPORTS_END_TIME       |
-                         PVR_TIMER_TYPE_SUPPORTS_PRIORITY       |
-                         PVR_TIMER_TYPE_SUPPORTS_LIFETIME       |
+      type.SetAttributes(PVR_TIMER_TYPE_IS_MANUAL | PVR_TIMER_TYPE_SUPPORTS_ENABLE_DISABLE |
+                         PVR_TIMER_TYPE_SUPPORTS_CHANNELS | PVR_TIMER_TYPE_SUPPORTS_START_TIME |
+                         PVR_TIMER_TYPE_SUPPORTS_END_TIME | PVR_TIMER_TYPE_SUPPORTS_PRIORITY |
+                         PVR_TIMER_TYPE_SUPPORTS_LIFETIME |
                          PVR_TIMER_TYPE_SUPPORTS_RECORDING_FOLDERS);
       types.push_back(std::move(type));
     }
@@ -1047,12 +1034,12 @@ PVR_ERROR cVNSIData::GetTimerTypes(std::vector<kodi::addon::PVRTimerType>& types
   }
   catch (std::exception e)
   {
-    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __FUNCTION__, e.what());
+    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __func__, e.what());
     return PVR_ERROR_SERVER_ERROR;
   }
 }
 
-int cVNSIData::GetTimersAmount()
+int CVNSIClientInstance::GetTimersAmount()
 {
   try
   {
@@ -1072,12 +1059,12 @@ int cVNSIData::GetTimersAmount()
   }
   catch (std::exception e)
   {
-    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __FUNCTION__, e.what());
+    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __func__, e.what());
     return PVR_ERROR_SERVER_ERROR;
   }
 }
 
-PVR_ERROR cVNSIData::GetTimers(std::vector<kodi::addon::PVRTimer>& timers)
+PVR_ERROR CVNSIClientInstance::GetTimers(std::vector<kodi::addon::PVRTimer>& timers)
 {
   try
   {
@@ -1121,15 +1108,13 @@ PVR_ERROR cVNSIData::GetTimers(std::vector<kodi::addon::PVRTimer>& timers)
         tag.SetEndTime(vresp->extract_U32());
         tag.SetFirstDay(vresp->extract_U32());
         tag.SetWeekdays(vresp->extract_U32());
-        char *strTitle = vresp->extract_String();
-        tag.SetTitle(strTitle);
+        tag.SetTitle(vresp->extract_String());
         tag.SetMarginStart(0);
         tag.SetMarginEnd(0);
 
         if (GetProtocol() >= 9)
         {
-          char *epgSearch = vresp->extract_String();
-          tag.SetEPGSearchString(epgSearch);
+          tag.SetEPGSearchString(vresp->extract_String());
 
           if (tag.GetTimerType() == VNSI_TIMER_TYPE_MAN && tag.GetWeekdays())
             tag.SetTimerType(VNSI_TIMER_TYPE_MAN_REPEAT);
@@ -1158,12 +1143,12 @@ PVR_ERROR cVNSIData::GetTimers(std::vector<kodi::addon::PVRTimer>& timers)
   }
   catch (std::exception e)
   {
-    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __FUNCTION__, e.what());
+    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __func__, e.what());
     return PVR_ERROR_SERVER_ERROR;
   }
 }
 
-PVR_ERROR cVNSIData::AddTimer(const kodi::addon::PVRTimer& timer)
+PVR_ERROR CVNSIClientInstance::AddTimer(const kodi::addon::PVRTimer& timer)
 {
   try
   {
@@ -1227,12 +1212,12 @@ PVR_ERROR cVNSIData::AddTimer(const kodi::addon::PVRTimer& timer)
   }
   catch (std::exception e)
   {
-    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __FUNCTION__, e.what());
+    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __func__, e.what());
     return PVR_ERROR_SERVER_ERROR;
   }
 }
 
-PVR_ERROR cVNSIData::DeleteTimer(const kodi::addon::PVRTimer& timer, bool forceDelete)
+PVR_ERROR CVNSIClientInstance::DeleteTimer(const kodi::addon::PVRTimer& timer, bool forceDelete)
 {
   try
   {
@@ -1260,12 +1245,12 @@ PVR_ERROR cVNSIData::DeleteTimer(const kodi::addon::PVRTimer& timer, bool forceD
   }
   catch (std::exception e)
   {
-    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __FUNCTION__, e.what());
+    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __func__, e.what());
     return PVR_ERROR_SERVER_ERROR;
   }
 }
 
-PVR_ERROR cVNSIData::UpdateTimer(const kodi::addon::PVRTimer& timer)
+PVR_ERROR CVNSIClientInstance::UpdateTimer(const kodi::addon::PVRTimer& timer)
 {
   try
   {
@@ -1322,19 +1307,20 @@ PVR_ERROR cVNSIData::UpdateTimer(const kodi::addon::PVRTimer& timer)
   }
   catch (std::exception e)
   {
-    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __FUNCTION__, e.what());
+    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __func__, e.what());
     return PVR_ERROR_SERVER_ERROR;
   }
 }
 
-bool cVNSIData::GenTimerChildren(const kodi::addon::PVRTimer& timer, std::vector<kodi::addon::PVRTimer>& timers)
+bool CVNSIClientInstance::GenTimerChildren(const kodi::addon::PVRTimer& timer,
+                                           std::vector<kodi::addon::PVRTimer>& timers)
 {
   time_t now = time(nullptr);
   time_t firstDay = timer.GetFirstDay();
   time_t startTime = timer.GetStartTime();
   time_t endTime = timer.GetEndTime();
 
-  struct tm *loctime = localtime(&startTime);
+  struct tm* loctime = localtime(&startTime);
   int startSec = loctime->tm_hour * 3600 + loctime->tm_min * 60;
   loctime = localtime(&endTime);
   int stopSec = loctime->tm_hour * 3600 + loctime->tm_min * 60;
@@ -1373,7 +1359,7 @@ bool cVNSIData::GenTimerChildren(const kodi::addon::PVRTimer& timer, std::vector
   return true;
 }
 
-std::string cVNSIData::GenTimerFolder(std::string directory, std::string title)
+std::string CVNSIClientInstance::GenTimerFolder(std::string directory, std::string title)
 {
   // add directory in front of the title
   std::string path;
@@ -1392,14 +1378,14 @@ std::string cVNSIData::GenTimerFolder(std::string directory, std::string title)
       }
     }
 
-    if (path.size() > 0 && path[path.size()-1] != '/')
+    if (path.size() > 0 && path[path.size() - 1] != '/')
     {
       path += "/";
     }
   }
 
   // replace directory separators
-  for (std::size_t i=0; i<path.size(); i++)
+  for (std::size_t i = 0; i < path.size(); i++)
   {
     if (path[i] == '/' || path[i] == '\\')
     {
@@ -1413,7 +1399,7 @@ std::string cVNSIData::GenTimerFolder(std::string directory, std::string title)
   }
 
   // replace colons
-  for (std::size_t i=0; i<path.size(); i++)
+  for (std::size_t i = 0; i < path.size(); i++)
   {
     if (path[i] == ':')
     {
@@ -1424,7 +1410,7 @@ std::string cVNSIData::GenTimerFolder(std::string directory, std::string title)
   return path;
 }
 
-PVR_ERROR cVNSIData::GetTimerInfo(unsigned int timernumber, kodi::addon::PVRTimer& tag)
+PVR_ERROR CVNSIClientInstance::GetTimerInfo(unsigned int timernumber, kodi::addon::PVRTimer& tag)
 {
   cRequestPacket vrp;
 
@@ -1453,9 +1439,9 @@ PVR_ERROR cVNSIData::GetTimerInfo(unsigned int timernumber, kodi::addon::PVRTime
   }
 
   tag.SetClientIndex(vresp->extract_U32());
-  int iActive    (vresp->extract_U32());
-  int iRecording (vresp->extract_U32());
-  int iPending   (vresp->extract_U32());
+  int iActive(vresp->extract_U32());
+  int iRecording(vresp->extract_U32());
+  int iPending(vresp->extract_U32());
   if (iRecording)
     tag.SetState(PVR_TIMER_STATE_RECORDING);
   else if (iPending || iActive)
@@ -1470,13 +1456,11 @@ PVR_ERROR cVNSIData::GetTimerInfo(unsigned int timernumber, kodi::addon::PVRTime
   tag.SetEndTime(vresp->extract_U32());
   tag.SetFirstDay(vresp->extract_U32());
   tag.SetWeekdays(vresp->extract_U32());
-  char *strTitle = vresp->extract_String();
-  tag.SetTitle(strTitle);
+  tag.SetTitle(vresp->extract_String());
 
   if (GetProtocol() >= 9)
   {
-    char *epgSearch = vresp->extract_String();
-    tag.SetEPGSearchString(epgSearch);
+    tag.SetEPGSearchString(vresp->extract_String());
 
     if (tag.GetTimerType() == VNSI_TIMER_TYPE_MAN && tag.GetWeekdays())
       tag.SetTimerType(VNSI_TIMER_TYPE_MAN_REPEAT);
@@ -1490,7 +1474,8 @@ PVR_ERROR cVNSIData::GetTimerInfo(unsigned int timernumber, kodi::addon::PVRTime
   return PVR_ERROR_NO_ERROR;
 }
 
-PVR_ERROR cVNSIData::RenameTimer(const kodi::addon::PVRTimer& timerinfo, const std::string& newname)
+PVR_ERROR CVNSIClientInstance::RenameTimer(const kodi::addon::PVRTimer& timerinfo,
+                                           const std::string& newname)
 {
   kodi::addon::PVRTimer timerinfo1;
 
@@ -1506,7 +1491,7 @@ PVR_ERROR cVNSIData::RenameTimer(const kodi::addon::PVRTimer& timerinfo, const s
 /*******************************************/
 /** PVR Live Stream Functions             **/
 
-bool cVNSIData::OpenLiveStream(const kodi::addon::PVRChannel& channel)
+bool CVNSIClientInstance::OpenLiveStream(const kodi::addon::PVRChannel& channel)
 {
   CloseLiveStream();
 
@@ -1525,7 +1510,7 @@ bool cVNSIData::OpenLiveStream(const kodi::addon::PVRChannel& channel)
   }
   catch (std::exception e)
   {
-    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __FUNCTION__, e.what());
+    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __func__, e.what());
     delete m_demuxer;
     m_demuxer = nullptr;
     return false;
@@ -1533,14 +1518,15 @@ bool cVNSIData::OpenLiveStream(const kodi::addon::PVRChannel& channel)
   return false;
 }
 
-void cVNSIData::CloseLiveStream()
+void CVNSIClientInstance::CloseLiveStream()
 {
   delete m_demuxer;
   m_demuxer = nullptr;
 }
 
 
-PVR_ERROR cVNSIData::GetStreamProperties(std::vector<kodi::addon::PVRStreamProperties>& properties)
+PVR_ERROR CVNSIClientInstance::GetStreamProperties(
+    std::vector<kodi::addon::PVRStreamProperties>& properties)
 {
   if (!m_demuxer)
     return PVR_ERROR_SERVER_ERROR;
@@ -1548,19 +1534,19 @@ PVR_ERROR cVNSIData::GetStreamProperties(std::vector<kodi::addon::PVRStreamPrope
   return (m_demuxer->GetStreamProperties(properties) ? PVR_ERROR_NO_ERROR : PVR_ERROR_SERVER_ERROR);
 }
 
-DemuxPacket* cVNSIData::DemuxRead()
+DemuxPacket* CVNSIClientInstance::DemuxRead()
 {
   if (!m_demuxer)
     return nullptr;
 
-  DemuxPacket *pkt;
+  DemuxPacket* pkt;
   try
   {
     pkt = m_demuxer->Read();
   }
   catch (std::exception e)
   {
-    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __FUNCTION__, e.what());
+    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __func__, e.what());
     return nullptr;
   }
 
@@ -1576,13 +1562,13 @@ DemuxPacket* cVNSIData::DemuxRead()
   return pkt;
 }
 
-void cVNSIData::DemuxAbort()
+void CVNSIClientInstance::DemuxAbort()
 {
   if (m_demuxer)
     m_demuxer->Abort();
 }
 
-bool cVNSIData::SeekTime(double time, bool backwards, double& startpts)
+bool CVNSIClientInstance::SeekTime(double time, bool backwards, double& startpts)
 {
   bool ret = false;
   try
@@ -1592,12 +1578,12 @@ bool cVNSIData::SeekTime(double time, bool backwards, double& startpts)
   }
   catch (std::exception e)
   {
-    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __FUNCTION__, e.what());
+    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __func__, e.what());
   }
   return ret;
 }
 
-bool cVNSIData::CanPauseStream()
+bool CVNSIClientInstance::CanPauseStream()
 {
   bool ret = false;
   if (m_demuxer)
@@ -1605,7 +1591,7 @@ bool cVNSIData::CanPauseStream()
   return ret;
 }
 
-bool cVNSIData::CanSeekStream()
+bool CVNSIClientInstance::CanSeekStream()
 {
   bool ret = false;
   if (m_demuxer)
@@ -1613,7 +1599,7 @@ bool cVNSIData::CanSeekStream()
   return ret;
 }
 
-bool cVNSIData::IsRealTimeStream()
+bool CVNSIClientInstance::IsRealTimeStream()
 {
   if (m_demuxer)
   {
@@ -1626,7 +1612,7 @@ bool cVNSIData::IsRealTimeStream()
   return false;
 }
 
-PVR_ERROR cVNSIData::GetStreamTimes(kodi::addon::PVRStreamTimes& times)
+PVR_ERROR CVNSIClientInstance::GetStreamTimes(kodi::addon::PVRStreamTimes& times)
 {
   if (m_demuxer && m_demuxer->GetStreamTimes(times))
   {
@@ -1645,14 +1631,15 @@ PVR_ERROR cVNSIData::GetStreamTimes(kodi::addon::PVRStreamTimes& times)
 /*******************************************/
 /** PVR Recording Stream Functions        **/
 
-bool cVNSIData::OpenRecordedStream(const kodi::addon::PVRRecording& recording)
+bool CVNSIClientInstance::OpenRecordedStream(const kodi::addon::PVRRecording& recording)
 {
   CloseRecordedStream();
 
   m_recording = new cVNSIRecording(*this);
   try
   {
-    if (!m_recording->OpenRecording(recording)) {
+    if (!m_recording->OpenRecording(recording))
+    {
       delete m_recording;
       m_recording = nullptr;
       return false;
@@ -1662,20 +1649,20 @@ bool cVNSIData::OpenRecordedStream(const kodi::addon::PVRRecording& recording)
   }
   catch (std::exception e)
   {
-    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __FUNCTION__, e.what());
+    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __func__, e.what());
     delete m_recording;
     m_recording = nullptr;
     return false;
   }
 }
 
-void cVNSIData::CloseRecordedStream()
+void CVNSIClientInstance::CloseRecordedStream()
 {
   delete m_recording;
   m_recording = nullptr;
 }
 
-int cVNSIData::ReadRecordedStream(unsigned char* buffer, unsigned int size)
+int CVNSIClientInstance::ReadRecordedStream(unsigned char* buffer, unsigned int size)
 {
   if (!m_recording)
     return -1;
@@ -1686,12 +1673,12 @@ int cVNSIData::ReadRecordedStream(unsigned char* buffer, unsigned int size)
   }
   catch (std::exception e)
   {
-    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __FUNCTION__, e.what());
+    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __func__, e.what());
     return -1;
   }
 }
 
-int64_t cVNSIData::SeekRecordedStream(int64_t position, int whence)
+int64_t CVNSIClientInstance::SeekRecordedStream(int64_t position, int whence)
 {
   try
   {
@@ -1700,20 +1687,20 @@ int64_t cVNSIData::SeekRecordedStream(int64_t position, int whence)
   }
   catch (std::exception e)
   {
-    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __FUNCTION__, e.what());
+    kodi::Log(ADDON_LOG_ERROR, "%s - %s", __func__, e.what());
   }
 
   return -1;
 }
 
-int64_t cVNSIData::LengthRecordedStream()
+int64_t CVNSIClientInstance::LengthRecordedStream()
 {
   if (m_recording)
     return m_recording->Length();
   return 0;
 }
 
-PVR_ERROR cVNSIData::GetStreamReadChunkSize(int& chunksize)
+PVR_ERROR CVNSIClientInstance::GetStreamReadChunkSize(int& chunksize)
 {
   chunksize = CVNSISettings::Get().GetChunkSize();
   return PVR_ERROR_NO_ERROR;
@@ -1721,7 +1708,7 @@ PVR_ERROR cVNSIData::GetStreamReadChunkSize(int& chunksize)
 
 //--==----==----==----==----==----==----==----==----==----==----==----==----==
 
-bool cVNSIData::EnableStatusInterface(bool onOff, bool wait)
+bool CVNSIClientInstance::EnableStatusInterface(bool onOff, bool wait)
 {
   cRequestPacket vrp;
   vrp.init(VNSI_ENABLESTATUSINTERFACE);
@@ -1744,25 +1731,26 @@ bool cVNSIData::EnableStatusInterface(bool onOff, bool wait)
   return ret == VNSI_RET_OK ? true : false;
 }
 
-bool cVNSIData::OnResponsePacket(cResponsePacket* pkt)
+bool CVNSIClientInstance::OnResponsePacket(cResponsePacket* pkt)
 {
   return false;
 }
 
-std::unique_ptr<cResponsePacket> cVNSIData::ReadResult(cRequestPacket* vrp)
+std::unique_ptr<cResponsePacket> CVNSIClientInstance::ReadResult(cRequestPacket* vrp)
 {
-  SMessage &message = m_queue.Enqueue(vrp->getSerial());
+  SMessage& message = m_queue.Enqueue(vrp->getSerial());
 
   if (cVNSISession::TransmitMessage(vrp) &&
       !message.event.Wait(CVNSISettings::Get().GetConnectTimeout() * 1000))
   {
-    kodi::Log(ADDON_LOG_ERROR, "%s - request timed out after %d seconds", __func__, CVNSISettings::Get().GetConnectTimeout());
+    kodi::Log(ADDON_LOG_ERROR, "%s - request timed out after %d seconds", __func__,
+              CVNSISettings::Get().GetConnectTimeout());
   }
 
   return m_queue.Dequeue(vrp->getSerial(), message);
 }
 
-void *cVNSIData::Process()
+void* CVNSIClientInstance::Process()
 {
   std::unique_ptr<cResponsePacket> vresp;
 
@@ -1776,7 +1764,8 @@ void *cVNSIData::Process()
       {
         if (!kodi::network::WakeOnLan(m_wolMac))
         {
-          kodi::Log(ADDON_LOG_ERROR, "Error waking up VNSI Server at MAC-Address %s", m_wolMac.c_str());
+          kodi::Log(ADDON_LOG_ERROR, "Error waking up VNSI Server at MAC-Address %s",
+                    m_wolMac.c_str());
         }
       }
 
@@ -1785,8 +1774,8 @@ void *cVNSIData::Process()
       {
         if (state == cVNSISession::CONN_HOST_NOT_REACHABLE)
         {
-          kodi::addon::CInstancePVRClient::ConnectionStateChange("vnsi server not reacheable",
-                                     PVR_CONNECTION_STATE_SERVER_UNREACHABLE, nullptr);
+          kodi::addon::CInstancePVRClient::ConnectionStateChange(
+              "vnsi server not reacheable", PVR_CONNECTION_STATE_SERVER_UNREACHABLE, "");
         }
 
         Sleep(1000);
@@ -1814,7 +1803,7 @@ void *cVNSIData::Process()
       if (vresp->getRequestID() == VNSI_STATUS_MESSAGE)
       {
         uint32_t type = vresp->extract_U32();
-        char* msgstr  = vresp->extract_String();
+        char* msgstr = vresp->extract_String();
 
         std::string strMessageTranslated;
         if (CVNSISettings::Get().GetCharsetConv())
@@ -1828,7 +1817,6 @@ void *cVNSIData::Process()
           kodi::QueueNotification(QUEUE_WARNING, "", strMessageTranslated);
         else
           kodi::QueueNotification(QUEUE_INFO, "", strMessageTranslated);
-
       }
       else if (vresp->getRequestID() == VNSI_STATUS_RECORDING)
       {
@@ -1867,9 +1855,9 @@ void *cVNSIData::Process()
 
     else if (!OnResponsePacket(vresp.get()))
     {
-      kodi::Log(ADDON_LOG_ERROR, "%s - Rxd a response packet on channel %lu !!", __func__, vresp->getChannelID());
+      kodi::Log(ADDON_LOG_ERROR, "%s - Rxd a response packet on channel %lu !!", __func__,
+                vresp->getChannelID());
     }
   }
   return nullptr;
 }
-

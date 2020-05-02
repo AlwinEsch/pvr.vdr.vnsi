@@ -7,13 +7,11 @@
  *  See LICENSE.md for more information.
  */
 
-#include "VNSIChannels.h"
+#include "Channels.h"
+
 #include <algorithm>
 
-CProvider::CProvider(std::string name, int caid)
-  : m_name(name),
-    m_caid(caid),
-    m_whitelist(false)
+CProvider::CProvider(std::string name, int caid) : m_name(name), m_caid(caid), m_whitelist(false)
 {
 
 }
@@ -105,7 +103,7 @@ void CVNSIChannels::LoadChannelBlacklist()
   for (auto b : m_channelBlacklist)
   {
     auto it = m_channelsMap.find(b);
-    if (it!=m_channelsMap.end())
+    if (it != m_channelsMap.end())
     {
       int idx = it->second;
       m_channels[idx].m_blacklist = true;
@@ -153,14 +151,14 @@ bool CVNSIChannels::IsWhitelist(const CChannel &channel) const
   {
     provider.m_caid = 0;
     auto p_it = std::find(m_providers.begin(), m_providers.end(), provider);
-    if (p_it!=m_providers.end() && p_it->m_whitelist)
+    if (p_it != m_providers.end() && p_it->m_whitelist)
       return true;
   }
   for (auto caid : channel.m_caids)
   {
     provider.m_caid = caid;
     auto p_it = std::find(m_providers.begin(), m_providers.end(), provider);
-    if (p_it!=m_providers.end() && p_it->m_whitelist)
+    if (p_it != m_providers.end() && p_it->m_whitelist)
       return true;
   }
   return false;

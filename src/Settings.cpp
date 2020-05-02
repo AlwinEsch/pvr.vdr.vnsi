@@ -13,7 +13,8 @@
 
 namespace
 {
-int prioVals[] = {0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95,99,100};
+int prioVals[] = {0,  5,  10, 15, 20, 25, 30, 35, 40, 45, 50,
+                  55, 60, 65, 70, 75, 80, 85, 90, 95, 99, 100};
 }
 
 CVNSISettings& CVNSISettings::Get()
@@ -28,7 +29,8 @@ bool CVNSISettings::Load()
   if (!kodi::CheckSettingString("host", m_szHostname))
   {
     // If setting is unknown fallback to defaults
-    kodi::Log(ADDON_LOG_ERROR, "Couldn't get 'host' setting, falling back to '%s' as default", DEFAULT_HOST);
+    kodi::Log(ADDON_LOG_ERROR, "Couldn't get 'host' setting, falling back to '%s' as default",
+              DEFAULT_HOST);
     m_szHostname = DEFAULT_HOST;
   }
 
@@ -44,7 +46,8 @@ bool CVNSISettings::Load()
   if (!kodi::CheckSettingInt("port", m_iPort))
   {
     // If setting is unknown fallback to defaults
-    kodi::Log(ADDON_LOG_ERROR, "Couldn't get 'port' setting, falling back to '%i' as default", DEFAULT_PORT);
+    kodi::Log(ADDON_LOG_ERROR, "Couldn't get 'port' setting, falling back to '%i' as default",
+              DEFAULT_PORT);
     m_iPort = DEFAULT_PORT;
   }
 
@@ -57,7 +60,8 @@ bool CVNSISettings::Load()
   else
   {
     // If setting is unknown fallback to defaults
-    kodi::Log(ADDON_LOG_ERROR, "Couldn't get 'priority' setting, falling back to %i as default", -1);
+    kodi::Log(ADDON_LOG_ERROR, "Couldn't get 'priority' setting, falling back to %i as default",
+              -1);
     m_iPriority = DEFAULT_PRIORITY;
   }
 
@@ -65,7 +69,8 @@ bool CVNSISettings::Load()
   if (!kodi::CheckSettingInt("timeshift", m_iTimeshift))
   {
     // If setting is unknown fallback to defaults
-    kodi::Log(ADDON_LOG_ERROR, "Couldn't get 'timeshift' setting, falling back to %i as default", 1);
+    kodi::Log(ADDON_LOG_ERROR, "Couldn't get 'timeshift' setting, falling back to %i as default",
+              1);
     m_iTimeshift = 1;
   }
 
@@ -73,7 +78,8 @@ bool CVNSISettings::Load()
   if (!kodi::CheckSettingBoolean("convertchar", m_bCharsetConv))
   {
     /* If setting is unknown fallback to defaults */
-    kodi::Log(ADDON_LOG_ERROR, "Couldn't get 'convertchar' setting, falling back to 'false' as default");
+    kodi::Log(ADDON_LOG_ERROR,
+              "Couldn't get 'convertchar' setting, falling back to 'false' as default");
     m_bCharsetConv = DEFAULT_CHARCONV;
   }
 
@@ -81,7 +87,9 @@ bool CVNSISettings::Load()
   if (!kodi::CheckSettingInt("timeout", m_iConnectTimeout))
   {
     /* If setting is unknown fallback to defaults */
-    kodi::Log(ADDON_LOG_ERROR, "Couldn't get 'timeout' setting, falling back to %i seconds as default", DEFAULT_TIMEOUT);
+    kodi::Log(ADDON_LOG_ERROR,
+              "Couldn't get 'timeout' setting, falling back to %i seconds as default",
+              DEFAULT_TIMEOUT);
     m_iConnectTimeout = DEFAULT_TIMEOUT;
   }
 
@@ -89,7 +97,8 @@ bool CVNSISettings::Load()
   if (!kodi::CheckSettingBoolean("autochannelgroups", m_bAutoChannelGroups))
   {
     // If setting is unknown fallback to defaults
-    kodi::Log(ADDON_LOG_ERROR, "Couldn't get 'autochannelgroups' setting, falling back to 'false' as default");
+    kodi::Log(ADDON_LOG_ERROR,
+              "Couldn't get 'autochannelgroups' setting, falling back to 'false' as default");
     m_bAutoChannelGroups = DEFAULT_AUTOGROUPS;
   }
 
@@ -105,19 +114,22 @@ bool CVNSISettings::Load()
   if (!kodi::CheckSettingInt("chunksize", m_iChunkSize))
   {
     /* If setting is unknown fallback to defaults */
-    kodi::Log(ADDON_LOG_ERROR, "Couldn't get 'chunksize' setting, falling back to %i as default", DEFAULT_CHUNKSIZE);
+    kodi::Log(ADDON_LOG_ERROR, "Couldn't get 'chunksize' setting, falling back to %i as default",
+              DEFAULT_CHUNKSIZE);
     m_iChunkSize = DEFAULT_CHUNKSIZE;
   }
 
   return true;
 }
 
-ADDON_STATUS CVNSISettings::SetSetting(const std::string& settingName, const kodi::CSettingValue& settingValue)
+ADDON_STATUS CVNSISettings::SetSetting(const std::string& settingName,
+                                       const kodi::CSettingValue& settingValue)
 {
   if (settingName == "host")
   {
     std::string tmp_sHostname;
-    kodi::Log(ADDON_LOG_INFO, "Changed Setting 'host' from %s to %s", m_szHostname.c_str(), settingValue.GetString().c_str());
+    kodi::Log(ADDON_LOG_INFO, "Changed Setting 'host' from %s to %s", m_szHostname.c_str(),
+              settingValue.GetString().c_str());
     tmp_sHostname = m_szHostname;
     m_szHostname = settingValue.GetString();
     if (tmp_sHostname != m_szHostname)
@@ -127,7 +139,8 @@ ADDON_STATUS CVNSISettings::SetSetting(const std::string& settingName, const kod
   {
     kodi::Log(ADDON_LOG_INFO, "Changed Setting 'wol_mac'");
     std::string tmp_sWol_mac;
-    kodi::Log(ADDON_LOG_INFO, "Changed Setting 'wol_mac' from %s to %s", m_szWolMac.c_str(), settingValue.GetString().c_str());
+    kodi::Log(ADDON_LOG_INFO, "Changed Setting 'wol_mac' from %s to %s", m_szWolMac.c_str(),
+              settingValue.GetString().c_str());
     tmp_sWol_mac = m_szWolMac;
     m_szWolMac = settingValue.GetString();
     if (tmp_sWol_mac != m_szWolMac)
@@ -135,7 +148,8 @@ ADDON_STATUS CVNSISettings::SetSetting(const std::string& settingName, const kod
   }
   else if (settingName == "port")
   {
-    kodi::Log(ADDON_LOG_INFO, "Changed Setting 'port' from %u to %u", m_iPort, settingValue.GetInt());
+    kodi::Log(ADDON_LOG_INFO, "Changed Setting 'port' from %u to %u", m_iPort,
+              settingValue.GetInt());
     if (m_iPort != settingValue.GetInt())
     {
       m_iPort = settingValue.GetInt();
@@ -150,22 +164,26 @@ ADDON_STATUS CVNSISettings::SetSetting(const std::string& settingName, const kod
   }
   else if (settingName == "timeshift")
   {
-    kodi::Log(ADDON_LOG_INFO, "Changed Setting 'timeshift' from %u to %u", m_iTimeshift, settingValue.GetInt());
+    kodi::Log(ADDON_LOG_INFO, "Changed Setting 'timeshift' from %u to %u", m_iTimeshift,
+              settingValue.GetInt());
     m_iTimeshift = settingValue.GetInt();
   }
   else if (settingName == "convertchar")
   {
-    kodi::Log(ADDON_LOG_INFO, "Changed Setting 'convertchar' from %u to %u", m_bCharsetConv, settingValue.GetBoolean());
+    kodi::Log(ADDON_LOG_INFO, "Changed Setting 'convertchar' from %u to %u", m_bCharsetConv,
+              settingValue.GetBoolean());
     m_bCharsetConv = settingValue.GetBoolean();
   }
   else if (settingName == "timeout")
   {
-    kodi::Log(ADDON_LOG_INFO, "Changed Setting 'timeout' from %u to %u", m_iConnectTimeout, settingValue.GetInt());
+    kodi::Log(ADDON_LOG_INFO, "Changed Setting 'timeout' from %u to %u", m_iConnectTimeout,
+              settingValue.GetInt());
     m_iConnectTimeout = settingValue.GetInt();
   }
   else if (settingName == "autochannelgroups")
   {
-    kodi::Log(ADDON_LOG_INFO, "Changed Setting 'autochannelgroups' from %u to %u", m_bAutoChannelGroups, settingValue.GetBoolean());
+    kodi::Log(ADDON_LOG_INFO, "Changed Setting 'autochannelgroups' from %u to %u",
+              m_bAutoChannelGroups, settingValue.GetBoolean());
     if (m_bAutoChannelGroups != settingValue.GetBoolean())
     {
       m_bAutoChannelGroups = settingValue.GetBoolean();
@@ -174,7 +192,8 @@ ADDON_STATUS CVNSISettings::SetSetting(const std::string& settingName, const kod
   }
   else if (settingName == "chunksize")
   {
-    kodi::Log(ADDON_LOG_INFO, "Changed Setting 'chunksize' from %u to %u", m_iChunkSize, settingValue.GetInt());
+    kodi::Log(ADDON_LOG_INFO, "Changed Setting 'chunksize' from %u to %u", m_iChunkSize,
+              settingValue.GetInt());
     m_iChunkSize = settingValue.GetInt();
   }
 

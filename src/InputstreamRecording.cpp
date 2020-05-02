@@ -7,22 +7,20 @@
  *  See LICENSE.md for more information.
  */
 
-#include "VNSIRecording.h"
+#include "InputstreamRecording.h"
 
-#include "responsepacket.h"
-#include "requestpacket.h"
-#include "vnsicommand.h"
+#include "RequestPacket.h"
+#include "ResponsePacket.h"
 #include "Settings.h"
+#include "vnsicommand.h"
 
 #include <limits.h>
 
 #define SEEK_POSSIBLE 0x10 // flag used to check if protocol allows seeks
 
 cVNSIRecording::cVNSIRecording(kodi::addon::CInstancePVRClient& instance)
-  : cVNSISession(instance),
-    m_instance(instance)
+  : cVNSISession(instance), m_instance(instance)
 {
-
 }
 
 cVNSIRecording::~cVNSIRecording()
@@ -34,7 +32,8 @@ bool cVNSIRecording::OpenRecording(const kodi::addon::PVRRecording& recinfo)
 {
   m_recinfo = recinfo;
 
-  if(!cVNSISession::Open(CVNSISettings::Get().GetHostname(), CVNSISettings::Get().GetPort(), "XBMC RecordingStream Receiver"))
+  if (!cVNSISession::Open(CVNSISettings::Get().GetHostname(), CVNSISettings::Get().GetPort(),
+                          "XBMC RecordingStream Receiver"))
     return false;
 
   if(!cVNSISession::Login())
@@ -56,7 +55,8 @@ bool cVNSIRecording::OpenRecording(const kodi::addon::PVRRecording& recinfo)
     m_currentPlayingRecordPosition = 0;
   }
   else
-    kodi::Log(ADDON_LOG_ERROR, "%s - Can't open recording '%s'", __func__, recinfo.GetTitle().c_str());
+    kodi::Log(ADDON_LOG_ERROR, "%s - Can't open recording '%s'", __func__,
+              recinfo.GetTitle().c_str());
 
   return (returnCode == VNSI_RET_OK);
 }

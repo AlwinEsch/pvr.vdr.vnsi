@@ -42,15 +42,17 @@ public:
 private:
   CVNSISettings() = default;
   CVNSISettings(const CVNSISettings&) = delete;
-  CVNSISettings& operator = (const CVNSISettings&) = delete;
+  CVNSISettings& operator=(const CVNSISettings&) = delete;
 
 
   std::string m_szHostname = DEFAULT_HOST; /*!< hostname or ip-address of the server */
   std::string m_szWolMac;
   int m_iPort = DEFAULT_PORT; /*!< TCP port of the vnsi server */
   int m_iConnectTimeout = DEFAULT_TIMEOUT; /*!< Network connection / read timeout in seconds */
-  int m_iPriority = DEFAULT_PRIORITY; /*!< The Priority this client have in response to other clients */
-  bool m_bCharsetConv = DEFAULT_CHARCONV; /*!< Convert VDR's incoming strings to UTF8 character set */
+  int m_iPriority =
+      DEFAULT_PRIORITY; /*!< The Priority this client have in response to other clients */
+  bool m_bCharsetConv =
+      DEFAULT_CHARCONV; /*!< Convert VDR's incoming strings to UTF8 character set */
   bool m_bAutoChannelGroups = DEFAULT_AUTOGROUPS;
   int m_iTimeshift = 1;
   std::string m_szIconPath; /*!< path to channel icons */
